@@ -1,0 +1,25 @@
+[package]
+name = "gitty-tui"
+description = "Terminal UI for gitty"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "gitty"
+path = "src/main.rs"
+
+[dependencies]
+gitty-core.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+ratatui = "0.30"
+toml = "1"
+dirs = "6"
+notify = "8"
+ignore = "0.4"
+unicode-normalization = "0.1"
+unicode-width = "0.2"
+
+[dev-dependencies]
+tempfile = "3"

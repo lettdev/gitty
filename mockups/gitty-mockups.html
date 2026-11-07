@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gitty Mockups</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Be+Vietnam+Pro:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+/* Layout: a narrow reading column frames one wide "stage" that holds an interactive app mockup; same sample repo in both modes. */
+:root{
+  --bg:#f3f4f6; --fg:#161a20; --muted:#5b6371; --line:#d8dce3; --surface:#ffffff;
+  --accent:#1f7a5a; --l0:var(--accent); --l1:#8250df; --l2:#c4561d;
+  --add:#1a7f37; --del:#cf222e; --mod:#9a6700; --new:#0969da;
+  --app-bg:#ffffff; --app-side:#f3f4f7; --app-panel:#fafbfc; --app-line:#e3e6eb;
+  --app-fg:#1b1f27; --app-muted:#687083; --app-hover:#eef0f4;
+  --tm-art:#a9532a; --tm-audio:#6a4fb3; --tm-models:#2f6f94; --tm-scenes:#3d7f57; --tm-anim:#8a6d1f; --tm-code:#4b5563;
+  /* terminal: deliberately single dark look in both themes */
+  --t-bg:#0d0f12; --t-fg:#c9d1d9; --t-dim:#6e7681; --t-line:#30363d; --t-green:#3fb950; --t-red:#f85149;
+  --t-yellow:#d29922; --t-blue:#58a6ff; --t-mag:#bc8cff; --t-cyan:#39c5cf; --t-orange:#f0883e; --t-sel:#1c2a3d;
+  --f-display:"Bricolage Grotesque", "Be Vietnam Pro", system-ui, sans-serif;
+  --f-body:"Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1013; --fg:#e8eaee; --muted:#9aa1ad; --line:#272b33; --surface:#16191e;
+  --accent:#4cc79b; --l1:#a78bfa; --l2:#f0883e;
+  --add:#3fb950; --del:#f85149; --mod:#d29922; --new:#58a6ff;
+  --app-bg:#17191e; --app-side:#121418; --app-panel:#1b1e24; --app-line:#2a2e36;
+  --app-fg:#e4e7ec; --app-muted:#8a92a3; --app-hover:#22262d; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0e1013; --fg:#e8eaee; --muted:#9aa1ad; --line:#272b33; --surface:#16191e;
+  --accent:#4cc79b; --l1:#a78bfa; --l2:#f0883e;
+  --add:#3fb950; --del:#f85149; --mod:#d29922; --new:#58a6ff;
+  --app-bg:#17191e; --app-side:#121418; --app-panel:#1b1e24; --app-line:#2a2e36;
+  --app-fg:#e4e7ec; --app-muted:#8a92a3; --app-hover:#22262d; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.55}
+.page{max-width:1120px;margin:0 auto;padding-block:40px 72px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:28px}
+h1,h2{font-family:var(--f-display);text-wrap:balance;margin:0;letter-spacing:-.01em}
+h1{font-size:clamp(28px,4vw,40px);line-height:1.1}
+h2{font-size:22px}
+.lead{max-width:68ch;color:var(--muted);margin:10px 0 0}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px}
+.seg{display:inline-flex;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:3px}
+.seg button{font:500 14px var(--f-body);color:var(--muted);background:none;border:0;padding:8px 16px;border-radius:7px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.seg button:focus-visible,button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.hint{font-size:13px;color:var(--muted)}
+.hint kbd{font-family:var(--f-mono);font-size:12px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--surface);color:var(--fg)}
+.stage{overflow-x:auto;border-radius:12px;padding-bottom:4px}
+
+/* ---------- Desktop mockup ---------- */
+.win{position:relative;min-width:1000px;height:640px;display:grid;grid-template-rows:46px 1fr 30px;background:var(--app-bg);color:var(--app-fg);border:1px solid var(--app-line);border-radius:12px;overflow:hidden;font-size:13px;box-shadow:0 20px 50px -24px rgba(10,20,30,.35)}
+.tbar{display:flex;align-items:center;gap:14px;padding:0 14px;background:var(--app-side);border-bottom:1px solid var(--app-line)}
+.dots{display:flex;gap:7px}.dots i{width:12px;height:12px;border-radius:50%;background:#ff5f57}.dots i:nth-child(2){background:#febc2e}.dots i:nth-child(3){background:#28c840}
+.repo{font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid var(--app-line);background:var(--app-bg)}
+.pill .ah{color:var(--accent)}
+.search{flex:1;max-width:380px;margin-left:auto;display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;border:1px solid var(--app-line);background:var(--app-bg);color:var(--app-muted);font:13px var(--f-body);cursor:pointer;text-align:left}
+.search span{flex:1}
+.k{font-family:var(--f-mono);font-size:11px;border:1px solid var(--app-line);border-radius:4px;padding:0 5px}
+.tbtn{font:500 12px var(--f-body);color:var(--app-fg);background:var(--app-bg);border:1px solid var(--app-line);border-radius:7px;padding:5px 10px;cursor:pointer}
+.tbtn:hover{background:var(--app-hover)}
+.tbtn.pri{background:var(--accent);border-color:var(--accent);color:var(--app-bg)}
+.wbody{display:grid;grid-template-columns:214px 1fr;min-height:0}
+.side{background:var(--app-side);border-right:1px solid var(--app-line);padding:12px 8px;overflow:auto;display:flex;flex-direction:column;gap:14px}
+.sh{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--app-muted);padding:0 8px 4px}
+.si{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;white-space:nowrap;overflow:hidden}
+.si.on{background:color-mix(in srgb,var(--accent) 14%,transparent);font-weight:600}
+.si .meta{margin-left:auto;font-family:var(--f-mono);font-size:11px;color:var(--app-muted)}
+.dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--app-muted)}
+.dot.dirty{background:var(--mod)}.dot.clean{background:var(--add)}
+.main{display:grid;grid-template-rows:42px 1fr;min-width:0;min-height:0}
+.tabs{display:flex;align-items:flex-end;gap:4px;padding:0 14px;border-bottom:1px solid var(--app-line)}
+.tab{font:500 13px var(--f-body);color:var(--app-muted);background:none;border:0;border-bottom:2px solid transparent;padding:10px 12px;cursor:pointer;display:flex;gap:6px;align-items:center}
+.tab[aria-selected="true"]{color:var(--app-fg);border-color:var(--accent)}
+.tab .n{font-family:var(--f-mono);font-size:11px;background:var(--app-hover);border-radius:999px;padding:0 6px}
+.content{min-height:0;overflow:hidden}
+.changes{display:grid;grid-template-columns:310px 1fr;height:100%}
+.flist{border-right:1px solid var(--app-line);display:flex;flex-direction:column;min-height:0;background:var(--app-panel)}
+.fscroll{flex:1;overflow:auto;padding:8px}
+.gh{display:flex;align-items:center;justify-content:space-between;padding:6px 6px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--app-muted)}
+.gh button{font:500 11px var(--f-body);text-transform:none;letter-spacing:0;color:var(--accent);background:none;border:0;cursor:pointer}
+.fi{display:grid;grid-template-columns:18px 20px 1fr auto;align-items:center;gap:8px;padding:6px 6px;border-radius:6px;cursor:pointer}
+.fi:hover{background:var(--app-hover)}
+.fi.sel{background:color-mix(in srgb,var(--accent) 13%,transparent)}
+.cb{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--app-muted);background:none;padding:0;cursor:pointer;display:grid;place-items:center}
+.cb.on{background:var(--accent);border-color:var(--accent)}
+.cb.on::after{content:"";width:8px;height:4px;border-left:2px solid var(--app-bg);border-bottom:2px solid var(--app-bg);transform:rotate(-45deg) translate(1px,-1px)}
+.badge{font-family:var(--f-mono);font-size:11px;font-weight:700;text-align:center;border-radius:4px;padding:0 3px}
+.st-M{color:var(--mod)}.st-A,.st-\?{color:var(--add)}.st-D{color:var(--del)}
+.fn{display:flex;flex-direction:column;min-width:0;line-height:1.3}
+.fn b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fn span{font-size:11px;color:var(--app-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cnt{font-family:var(--f-mono);font-size:11px;white-space:nowrap}
+.cnt .a{color:var(--add)}.cnt .d{color:var(--del)}
+.cbox{border-top:1px solid var(--app-line);padding:10px;display:flex;flex-direction:column;gap:8px}
+.cbox textarea{font:13px var(--f-body);color:var(--app-fg);background:var(--app-bg);border:1px solid var(--app-line);border-radius:7px;padding:8px;resize:none;height:62px}
+.cbox .tbtn{padding:8px}
+.diff{display:flex;flex-direction:column;min-width:0;min-height:0}
+.dh{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--app-line);font-family:var(--f-mono);font-size:12px}
+.dh .p{color:var(--app-muted)}.dh b{color:var(--app-fg);font-weight:600}
+.dscroll{flex:1;overflow:auto;font-family:var(--f-mono);font-size:12.5px;line-height:1.6}
+.hunk{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 14px;background:color-mix(in srgb,var(--new) 9%,transparent);color:var(--app-muted);border-block:1px solid var(--app-line)}
+.hunk button{font:500 11px var(--f-body);color:var(--app-fg);background:var(--app-bg);border:1px solid var(--app-line);border-radius:5px;padding:2px 8px;cursor:pointer}
+.dl{display:grid;grid-template-columns:44px 44px 18px 1fr;white-space:pre}
+.dl .no{color:var(--app-muted);text-align:right;padding-right:8px;opacity:.7;user-select:none}
+.dl.add{background:color-mix(in srgb,var(--add) 13%,transparent)}.dl.add .sg{color:var(--add)}
+.dl.del{background:color-mix(in srgb,var(--del) 13%,transparent)}.dl.del .sg{color:var(--del)}
+.kw{color:var(--l1)}.cm{color:var(--app-muted);font-style:italic}
+.banner{margin:12px 14px;padding:10px 12px;border-radius:8px;border:1px solid color-mix(in srgb,var(--mod) 40%,transparent);background:color-mix(in srgb,var(--mod) 9%,transparent);font-family:var(--f-body);font-size:13px;white-space:normal}
+.banner b{font-weight:600}
+.imgcmp{display:flex;gap:24px;padding:24px;flex-wrap:wrap;font-family:var(--f-body)}
+.imgcmp figure{margin:0;display:flex;flex-direction:column;gap:8px;align-items:center}
+.chk{width:160px;height:160px;border-radius:8px;border:1px solid var(--app-line);display:grid;place-items:center;background-color:var(--app-panel);background-image:linear-gradient(45deg,var(--app-hover) 25%,transparent 25%,transparent 75%,var(--app-hover) 75%),linear-gradient(45deg,var(--app-hover) 25%,transparent 25%,transparent 75%,var(--app-hover) 75%);background-size:16px 16px;background-position:0 0,8px 8px}
+.imgcmp figcaption{font-size:12px;color:var(--app-muted);text-align:center}
+.imgcmp figcaption b{display:block;color:var(--app-fg);font-weight:600}
+.history{display:grid;grid-template-rows:1fr 210px;height:100%}
+.hlist{position:relative;overflow:auto}
+.hlist svg{position:absolute;left:0;top:0}
+.hrow{height:34px;display:grid;grid-template-columns:1fr 90px 90px 76px;align-items:center;gap:12px;padding:0 14px 0 66px;cursor:pointer;border-bottom:1px solid color-mix(in srgb,var(--app-line) 50%,transparent)}
+.hrow:hover{background:var(--app-hover)}
+.hrow.sel{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.hrow .msg{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;gap:6px;align-items:center}
+.hrow .au,.hrow .dt{color:var(--app-muted);font-size:12px}
+.hrow .hs{font-family:var(--f-mono);font-size:12px;color:var(--app-muted)}
+.ref{font-family:var(--f-mono);font-size:11px;padding:0 6px;border-radius:4px;border:1px solid currentColor;white-space:nowrap}
+.ref.head{color:var(--accent);font-weight:700}.ref.br{color:var(--l1)}.ref.rm{color:var(--app-muted)}.ref.tag{color:var(--l2)}
+.hdetail{border-top:1px solid var(--app-line);background:var(--app-panel);padding:14px 16px;overflow:auto;display:flex;flex-direction:column;gap:8px}
+.hdetail h3{margin:0;font-size:15px;font-weight:600}
+.hmeta{font-size:12px;color:var(--app-muted);font-family:var(--f-mono)}
+.hf{display:grid;grid-template-columns:20px 1fr auto auto;gap:10px;font-family:var(--f-mono);font-size:12px;align-items:center}
+.warn{font-family:var(--f-body);font-size:11px;font-weight:600;color:var(--mod);border:1px solid color-mix(in srgb,var(--mod) 45%,transparent);border-radius:4px;padding:0 6px}
+.ok{font-family:var(--f-body);font-size:11px;font-weight:600;color:var(--add)}
+.insight{height:100%;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:16px}
+.cards{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:12px}
+.card{border:1px solid var(--app-line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;background:var(--app-panel)}
+.card .lb{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--app-muted)}
+.card .v{font-family:var(--f-display);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:8px}
+.card .s{font-size:12px;color:var(--app-muted)}
+.card.w{border-color:color-mix(in srgb,var(--mod) 45%,transparent)}
+.card.w .v{color:var(--mod)}
+.split{display:grid;grid-template-columns:1.6fr 1fr;gap:16px}
+.box{border:1px solid var(--app-line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.box h4{margin:0;font-size:13px;font-weight:600;display:flex;justify-content:space-between;align-items:baseline}
+.box h4 small{font-weight:400;color:var(--app-muted);font-size:12px}
+.tm{position:relative;width:100%;aspect-ratio:100/52;max-width:100%;border-radius:6px;overflow:hidden}
+.tmc{position:absolute;border:1.5px solid var(--app-bg);color:#fff;padding:5px 7px;overflow:hidden;font-size:11px;line-height:1.3;display:flex;flex-direction:column}
+.tmc b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tmc span{font-family:var(--f-mono);opacity:.85}
+.leg{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--app-muted)}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.att{display:flex;flex-direction:column;gap:10px}
+.ai{display:grid;grid-template-columns:18px 1fr;gap:8px;font-size:12.5px}
+.ai .ic{font-weight:700}.ai .ic.w{color:var(--mod)}.ai .ic.g{color:var(--add)}
+.ai code,.cmd{font-family:var(--f-mono);font-size:11.5px;background:var(--app-hover);border-radius:4px;padding:1px 5px}
+.ai .acts{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.blobs{width:100%;border-collapse:collapse;font-size:12.5px}
+.blobs th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--app-muted);padding:6px 8px;border-bottom:1px solid var(--app-line)}
+.blobs td{padding:7px 8px;border-bottom:1px solid color-mix(in srgb,var(--app-line) 60%,transparent);font-variant-numeric:tabular-nums}
+.blobs td.m{font-family:var(--f-mono);font-size:12px}
+.blobs .lnk{font-family:var(--f-mono);font-size:12px;color:var(--accent);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.sbar{display:flex;align-items:center;gap:12px;padding:0 12px;border-top:1px solid var(--app-line);background:var(--app-side);font-family:var(--f-mono);font-size:11.5px;color:var(--app-muted)}
+.sbar .last{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sbar .last b{color:var(--accent);font-weight:500}
+.sbar button{font:11.5px var(--f-mono);color:var(--app-fg);background:none;border:1px solid var(--app-line);border-radius:5px;padding:1px 8px;cursor:pointer}
+.sbar button:disabled{opacity:.45;cursor:default}
+.overlay{position:absolute;inset:0;background:rgba(10,12,16,.35);display:flex;justify-content:center;align-items:flex-start;padding-top:70px;z-index:5}
+.pal{width:560px;background:var(--app-bg);border:1px solid var(--app-line);border-radius:12px;box-shadow:0 24px 60px -20px rgba(0,0,0,.5);overflow:hidden}
+.pal input{width:100%;border:0;border-bottom:1px solid var(--app-line);background:none;color:var(--app-fg);font:15px var(--f-body);padding:14px 16px;outline:none}
+.pl{max-height:330px;overflow:auto;padding:6px}
+.po{display:flex;justify-content:space-between;gap:16px;width:100%;text-align:left;border:0;background:none;color:var(--app-fg);font:13px var(--f-body);padding:9px 10px;border-radius:7px;cursor:pointer}
+.po:hover,.po:focus-visible{background:var(--app-hover)}
+.po code{font-family:var(--f-mono);font-size:11.5px;color:var(--app-muted);white-space:nowrap}
+.toast{position:absolute;right:16px;bottom:44px;background:var(--app-fg);color:var(--app-bg);padding:9px 14px;border-radius:8px;font-size:12.5px;z-index:6;max-width:420px;box-shadow:0 10px 30px -10px rgba(0,0,0,.4)}
+
+/* ---------- TUI mockup ---------- */
+.term{min-width:1000px;height:640px;background:var(--t-bg);color:var(--t-fg);border-radius:12px;border:1px solid #23272e;font-family:var(--f-mono);font-size:12.5px;line-height:1.5;display:grid;grid-template-rows:28px 1fr 26px;overflow:hidden;outline:none}
+.term:focus-visible{box-shadow:0 0 0 2px var(--accent)}
+.ttop{display:flex;align-items:center;gap:16px;padding:0 12px;background:#161b22;border-bottom:1px solid var(--t-line);white-space:nowrap}
+.ttop .nm{color:var(--t-green);font-weight:700}
+.ttab{color:var(--t-dim);cursor:pointer}.ttab.on{color:var(--t-bg);background:var(--t-green);padding:0 6px}
+.tgrid{display:grid;grid-template-columns:40ch 1fr;gap:6px;padding:10px 8px 4px;min-height:0}
+.tcol{display:flex;flex-direction:column;gap:12px;min-height:0}
+.pane{position:relative;border:1px solid var(--t-line);border-radius:4px;padding:8px 8px 6px;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+.pane.f{border-color:var(--t-green)}
+.pane>.pt{position:absolute;top:-10px;left:8px;background:var(--t-bg);padding:0 4px;color:var(--t-dim)}
+.pane.f>.pt{color:var(--t-green);font-weight:700}
+.pane .pb{overflow:auto;white-space:pre;min-height:0;flex:1}
+.tl{cursor:pointer;padding:0 2px}
+.tl.sel{background:var(--t-sel)}
+.pane.f .tl.sel{background:#264f78}
+.g{color:var(--t-green)}.r{color:var(--t-red)}.y{color:var(--t-yellow)}.b{color:var(--t-blue)}.m{color:var(--t-mag)}.c{color:var(--t-cyan)}.o{color:var(--t-orange)}.dm{color:var(--t-dim)}.bo{font-weight:700}
+.tbot{display:flex;align-items:center;gap:16px;padding:0 12px;background:#161b22;border-top:1px solid var(--t-line);white-space:nowrap;overflow:hidden}
+.tbot .kk{color:var(--t-cyan)}
+.tbot .last{margin-left:auto;color:var(--t-dim);overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- Comparison ---------- */
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.col{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.col h3{margin:0;font-family:var(--f-display);font-size:18px}
+.col .sub{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.col ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px}
+.col li{display:grid;grid-template-columns:18px 1fr;gap:6px;font-size:14px}
+.col li::before{font-weight:700}
+.col li.p::before{content:"+";color:var(--add)}
+.col li.n::before{content:"−";color:var(--del)}
+.rec{border-left:3px solid var(--accent);padding:4px 0 4px 16px;max-width:76ch}
+.rec p{margin:6px 0 0;color:var(--muted)}
+.rec code{font-family:var(--f-mono);font-size:13px;color:var(--fg)}
+@media (max-width:720px){.cmp{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<style>body{margin:0}</style>
+</head>
+<body>
+
+<div class="page">
+  <header>
+    <div class="eyebrow">gitty · bản phác giao diện</div>
+    <h1>Gitty trông sẽ ra sao?</h1>
+    <p class="lead">Cùng một repo mẫu (một project Unity tên <b>lantern-keep</b>, số liệu là ví dụ) được dựng theo hai hướng: app desktop và TUI trong terminal. Mỗi bản có ba màn: Changes, History và Insight. Bạn có thể bấm thử, tick để stage file, chọn commit, hoặc mở Insight.</p>
+  </header>
+
+  <div class="controls">
+    <div class="seg" role="group" aria-label="Chọn kiểu giao diện">
+      <button data-act="mode" data-v="desktop" id="m-desktop">Desktop app</button>
+      <button data-act="mode" data-v="tui" id="m-tui">TUI (terminal)</button>
+    </div>
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <div class="stage" id="stage"></div>
+
+  <section style="display:flex;flex-direction:column;gap:16px">
+    <h2>So sánh nhanh</h2>
+    <div class="cmp">
+      <div class="col">
+        <h3>Desktop app</h3>
+        <div class="sub">Tauri 2 · Rust core + web UI</div>
+        <ul>
+          <li class="p">Treemap, commit graph và các biểu đồ vẽ mượt, rõ ràng</li>
+          <li class="p">Diff được ảnh và texture, kéo thả commit khi rebase</li>
+          <li class="p">Người không quen terminal (artist, designer trong team) vẫn dùng được</li>
+          <li class="p">Command palette <code>⌘K</code> vẫn cho tốc độ gần với CLI</li>
+          <li class="n">Phải rời terminal sang một cửa sổ khác</li>
+          <li class="n">Không chạy được qua SSH trên máy chủ</li>
+        </ul>
+      </div>
+      <div class="col">
+        <h3>TUI</h3>
+        <div class="sub">Ratatui · Rust thuần</div>
+        <ul>
+          <li class="p">Gõ <code>gitty</code> là mở ngay trong terminal đang dùng</li>
+          <li class="p">Thao tác hoàn toàn bằng bàn phím, khởi động gần như tức thì</li>
+          <li class="p">Chạy được qua SSH, trong tmux, trên máy CI</li>
+          <li class="n">Treemap chỉ hiển thị được dạng thanh khối ký tự</li>
+          <li class="n">Không xem được ảnh diff, trừ khi terminal hỗ trợ kitty/iTerm2 graphics</li>
+          <li class="n">Chuột và kéo thả bị hạn chế</li>
+        </ul>
+      </div>
+    </div>
+    <div class="rec">
+      <strong>Không nhất thiết phải chọn một.</strong>
+      <p>Phần khó nhất (đọc repo, quét dung lượng, nhận diện loại project, undo log) có thể nằm trong một crate Rust chung <code>gitty-core</code>. Sau đó desktop và TUI chỉ là hai lớp giao diện mỏng gọi vào cùng core. Làm một giao diện trước, giao diện kia thêm sau mà không phải viết lại logic.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+const VIEWS=['changes','history','insight'];
+const S={mode:'desktop',view:'changes',file:'pc',commit:0,palette:false,toast:'',msg:'',
+  last:'git status --porcelain=v2',undo:[],tFocus:'files',
+  files:[
+    {id:'pc',path:'Assets/Scripts/Player/PlayerController.cs',st:'M',staged:false,a:6,d:0},
+    {id:'is',path:'Assets/Scripts/Inventory/InventorySlot.cs',st:'?',staged:false,a:15,d:0},
+    {id:'lv',path:'Assets/Scenes/Keep_Level01.unity',st:'M',staged:false,a:2,d:2},
+    {id:'ic',path:'Assets/Art/Textures/UI/icon_lantern.png',st:'M',staged:true,bin:true}
+  ]};
+const DIFF={
+pc:["@@ -14,6 +14,7 @@ public class PlayerController : MonoBehaviour",
+"     [SerializeField] float jumpForce = 12f;",
+"     Rigidbody2D rb;",
+"+    InventoryController inventory;",
+"     float coyoteCounter;",
+"",
+"     void Awake() {",
+"         rb = GetComponent<Rigidbody2D>();",
+"@@ -58,6 +59,11 @@ void Update()",
+"         HandleMovement();",
+"         HandleJump();",
+"+",
+"+        // Tab toggles the inventory panel",
+"+        if (Input.GetKeyDown(KeyCode.Tab)) {",
+"+            inventory.Toggle();",
+"+        }",
+"     }"],
+is:["@@ -0,0 +1,15 @@",
+"+using UnityEngine;",
+"+using UnityEngine.EventSystems;",
+"+",
+"+public class InventorySlot : MonoBehaviour, IDropHandler",
+"+{",
+"+    public ItemStack stack;",
+"+",
+"+    public void OnDrop(PointerEventData eventData)",
+"+    {",
+"+        var dragged = eventData.pointerDrag?.GetComponent<DraggableItem>();",
+"+        if (dragged == null) return;",
+"+        dragged.MoveTo(this);",
+"+    }",
+"+}",
+"+"],
+lv:["@@ -1204,8 +1204,8 @@ Transform:",
+" --- !u!4 &1840221937",
+" Transform:",
+"   m_GameObject: {fileID: 1840221936}  # InventoryChest",
+"-  m_LocalPosition: {x: 12.5, y: 0, z: -3.25}",
+"+  m_LocalPosition: {x: 14, y: 0, z: -3.25}",
+"   m_LocalScale: {x: 1, y: 1, z: 1}",
+"@@ -2310,7 +2310,7 @@ RenderSettings:",
+"   m_AmbientMode: 0",
+"-  m_AmbientIntensity: 1",
+"+  m_AmbientIntensity: 0.85",
+"   m_SkyboxMaterial: {fileID: 2100000}"]
+};
+const C=[
+ {h:'9e1c4ab',m:'Add InventorySlot drag & drop',a:'hang',d:'2h ago',lane:2,refs:[['head','HEAD → feat/inventory']],g:'    ◉',
+  f:[['A','Assets/Scripts/Inventory/DraggableItem.cs','+48'],['M','Assets/Prefabs/UI/Slot.prefab','+12 −3']]},
+ {h:'7b20f3e',m:'Inventory grid layout + slot prefab',a:'hang',d:'5h ago',lane:2,refs:[],g:'    ●',
+  f:[['A','Assets/Scripts/Inventory/InventoryGrid.cs','+96'],['A','Assets/Prefabs/UI/Slot.prefab','+210'],['M','Assets/Scenes/Keep_Level01.unity','+40 −2']]},
+ {h:'c41a9d2',m:"Merge branch 'fix/jump-buffer'",a:'linh',d:'1d ago',lane:0,refs:[['br','main'],['rm','origin/main']],g:'●─╮ │',
+  f:[],merge:'52e0b7a, e8d3f61'},
+ {h:'52e0b7a',m:'Bake lighting for Keep_Level01',a:'linh',d:'1d ago',lane:0,refs:[],g:'● │ │',
+  f:[['A','Assets/Scenes/Keep_Level01/LightingData.asset','61 MB','nolfs'],['M','Assets/Scenes/Keep_Level01.unity','+8 −8']]},
+ {h:'e8d3f61',m:'Fix coyote time & jump buffer',a:'hang',d:'2d ago',lane:1,refs:[['br','fix/jump-buffer']],g:'│ ● │',
+  f:[['M','Assets/Scripts/Player/PlayerController.cs','+18 −6']]},
+ {h:'a3f91c2',m:'Import cliff textures (8K)',a:'linh',d:'3d ago',lane:0,refs:[],g:'●─┴─╯',
+  f:[['A','Assets/Art/Textures/Env/cliff_albedo_8k.psd','412 MB','nolfs'],['A','Assets/Art/Textures/Env/cliff_normal_8k.psd','388 MB','nolfs'],['A','Assets/Art/Textures/Env/cliff_rough_4k.png','42 MB','lfs']]},
+ {h:'1d77c09',m:'URP setup, post-processing volume',a:'hang',d:'5d ago',lane:0,refs:[['tag','v0.3.0']],g:'●',
+  f:[['M','Packages/manifest.json','+3 −1'],['A','Assets/Settings/URP-HighFidelity.asset','+122'],['A','Assets/Settings/PostFX.asset','+64']]},
+ {h:'0b4e2aa',m:'Initial Unity project',a:'hang',d:'2w ago',lane:0,refs:[],g:'●',
+  f:[['A','214 files','+18,402']]}
+];
+const EDGES=[[0,1],[1,5],[2,3],[2,4,1],[3,5],[4,5],[5,6],[6,7]];
+const TM=[['Textures/Env',1210,'art'],['Audio/Music',480,'audio'],['Textures/Characters',420,'art'],['Models',410,'models'],['Textures/UI',210,'art'],['Audio/SFX',140,'audio'],['Scenes',86,'scenes'],['Animations',64,'anim'],['Packages',12,'code'],['Other',8,'code'],['Scripts',4.2,'code']];
+const CAT={art:'Art',audio:'Audio',models:'Models',scenes:'Scenes',anim:'Animation',code:'Code & config'};
+const BLOBS=[['Assets/Art/Textures/Env/cliff_albedo_8k.psd',412,5,false],['Assets/Art/Textures/Env/cliff_normal_8k.psd',388,5,false],['Assets/Audio/Music/theme_main_loop.wav',96,6,true],['Assets/Models/keep_exterior.fbx',74,6,true],['Assets/Scenes/Keep_Level01/LightingData.asset',61,3,false]];
+const PAL=[['Switch branch…','git switch <branch>'],['Create branch from HEAD…','git switch -c <name>'],['Stash all changes','git stash push -m "WIP"'],['Interactive rebase onto main','git rebase -i main'],['Push feat/inventory to origin','git push -u origin feat/inventory'],['Track *.psd with LFS','git lfs track "*.psd"'],['Show largest files in history','git rev-list --objects --all | git cat-file …'],['Open Insight','—']];
+
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const base=p=>p.split('/').pop(), dir=p=>p.split('/').slice(0,-1).join('/');
+const fmt=mb=>mb>=1024?(mb/1024).toFixed(2)+' GB':(mb>=10?Math.round(mb):mb.toFixed(1))+' MB';
+const fileById=id=>S.files.find(f=>f.id===id);
+function hl(code){let s=esc(code);
+  const i=s.indexOf('//'), j=s.indexOf('#');
+  let tail='';
+  if(i>=0){tail='<span class="cm">'+s.slice(i)+'</span>';s=s.slice(0,i);}
+  else if(j>=0&&s.includes('fileID')){tail='<span class="cm">'+s.slice(j)+'</span>';s=s.slice(0,j);}
+  s=s.replace(/\b(public|class|void|if|return|var|using|float|null|this)\b/g,'<span class="kw">$1</span>');
+  return s+tail;}
+function parseDiff(lines){ // -> [{t:'h',text}|{t,o,n,text}]
+  const out=[];let o=0,n=0,hi=0;
+  for(const l of lines){
+    if(l.startsWith('@@')){const m=l.match(/-(\d+)(?:,\d+)? \+(\d+)/);o=+m[1];n=+m[2];if(o===0)o=1;out.push({t:'h',text:l,idx:hi++});continue;}
+    const sg=l[0]||' ',txt=l.slice(1);
+    if(sg==='+')out.push({t:'add',o:'',n:n++,text:txt});
+    else if(sg==='-')out.push({t:'del',o:o++,n:'',text:txt});
+    else out.push({t:'ctx',o:o++,n:n++,text:txt});
+  }return out;}
+function squarify(items,W,H){
+  let x=0,y=0,w=W,h=H,rest=items.slice();const out=[];
+  while(rest.length){
+    const tot=rest.reduce((s,a)=>s+a.v,0),sc=(w*h)/tot,sh=Math.min(w,h);
+    const worst=r=>{const ar=r.map(a=>a.v*sc),s=ar.reduce((a,b)=>a+b,0);return Math.max(sh*sh*Math.max(...ar)/(s*s),(s*s)/(sh*sh*Math.min(...ar)));};
+    let row=[rest[0]],i=1;
+    while(i<rest.length&&worst(row.concat(rest[i]))<=worst(row)){row.push(rest[i]);i++;}
+    const s=row.reduce((a,b)=>a+b.v*sc,0);
+    if(w>=h){const cw=s/h;let cy=y;row.forEach(r=>{const ch=r.v*sc/cw;out.push({...r,x,y:cy,w:cw,h:ch});cy+=ch;});x+=cw;w-=cw;}
+    else{const ch=s/w;let cx=x;row.forEach(r=>{const cw=r.v*sc/ch;out.push({...r,x:cx,y,w:cw,h:ch});cx+=cw;});y+=ch;h-=ch;}
+    rest=rest.slice(i);
+  }return out;}
+
+/* ---------------- actions ---------------- */
+let toastTimer;
+function toast(t){S.toast=t;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{S.toast='';render();},2600);}
+function toggle(id,record=true){const f=fileById(id);if(!f)return;
+  f.staged=!f.staged;
+  S.last=f.staged?`git add ${f.path}`:`git restore --staged ${f.path}`;
+  if(record)S.undo.push(id);}
+function stageAll(v){const ch=S.files.filter(f=>f.staged!==v);ch.forEach(f=>{f.staged=v;});
+  if(ch.length){S.undo.push(ch.map(f=>f.id));}S.last=v?'git add -A':'git restore --staged .';}
+function undo(){const u=S.undo.pop();if(!u)return;
+  if(Array.isArray(u)){u.forEach(id=>{const f=fileById(id);f.staged=!f.staged;});S.last='undo · restored index from operation log';}
+  else{toggle(u,false);S.last='undo · '+S.last;}
+  toast('Đã hoàn tác thao tác gần nhất');}
+function orderedFiles(){return [...S.files.filter(f=>!f.staged),...S.files.filter(f=>f.staged)];}
+
+/* ---------------- desktop ---------------- */
+function dFileItem(f){
+  const name=base(f.path),d=dir(f.path);
+  const cnt=f.bin?'<span class="dm">bin</span>':`<span class="a">+${f.a}</span> <span class="d">−${f.d}</span>`;
+  return `<div class="fi ${S.file===f.id?'sel':''}" data-act="file" data-id="${f.id}">
+    <button class="cb ${f.staged?'on':''}" data-act="toggle" data-id="${f.id}" aria-label="${f.staged?'Unstage':'Stage'} ${esc(name)}"></button>
+    <span class="badge st-${f.st==='?'?'\\?':f.st}">${f.st==='?'?'U':f.st}</span>
+    <span class="fn"><b>${esc(name)}</b><span>${esc(d)}</span></span>
+    <span class="cnt">${cnt}</span></div>`;}
+function dDiff(f){
+  let head=`<div class="dh"><span class="p">${esc(dir(f.path))}/</span><b>${esc(base(f.path))}</b><span style="margin-left:auto" class="p">${f.staged?'staged':'unstaged'}</span></div>`;
+  if(f.bin){
+    const lantern=(glow)=>`<svg width="84" height="104" viewBox="0 0 84 104" aria-hidden="true"><rect x="30" y="4" width="24" height="10" rx="3" fill="#6b5a3e"/><path d="M26 14h32l6 14v50l-6 12H26l-6-12V28z" fill="#7a6648"/><rect x="28" y="30" width="28" height="44" rx="6" fill="${glow}"/><circle cx="42" cy="52" r="9" fill="#fff6d6" opacity=".9"/><rect x="24" y="88" width="36" height="8" rx="3" fill="#6b5a3e"/></svg>`;
+    return head+`<div class="dscroll"><div class="imgcmp">
+      <figure><div class="chk">${lantern('#d99a2b')}</div><figcaption><b>Before</b>128×128 · 18.4 KB</figcaption></figure>
+      <figure><div class="chk">${lantern('#f2c14e')}</div><figcaption><b>After</b>128×128 · 21.1 KB</figcaption></figure>
+      <figure style="justify-content:center;max-width:220px"><figcaption style="text-align:left">Diff ảnh cạnh nhau. Bản thật có thêm chế độ trượt (swipe) và chồng mờ (onion skin) để so texture.</figcaption></figure>
+    </div></div>`;}
+  const rows=parseDiff(DIFF[f.id]).map(r=>r.t==='h'
+    ?`<div class="hunk"><span>${esc(r.text)}</span><button data-act="hunk" data-i="${r.idx}">${f.staged?'Unstage':'Stage'} hunk</button></div>`
+    :`<div class="dl ${r.t}"><span class="no">${r.o}</span><span class="no">${r.n}</span><span class="sg">${r.t==='add'?'+':r.t==='del'?'−':''}</span><span>${hl(r.text)}</span></div>`).join('');
+  const banner=f.id==='lv'?`<div class="banner"><b>Unity scene:</b> 1 GameObject di chuyển (<b>InventoryChest</b>, x 12.5 → 14) · RenderSettings đổi ambient 1 → 0.85. Gitty đọc YAML của Unity để tóm tắt, thay vì bắt bạn đọc 214 dòng diff thô.</div>`:'';
+  return head+`<div class="dscroll">${banner}${rows}</div>`;}
+function dChanges(){
+  const un=S.files.filter(f=>!f.staged),st=S.files.filter(f=>f.staged);
+  const sel=fileById(S.file);
+  return `<div class="changes"><div class="flist"><div class="fscroll">
+    <div class="gh"><span>Unstaged · ${un.length}</span>${un.length?'<button data-act="all" data-v="1">Stage all</button>':''}</div>
+    ${un.map(dFileItem).join('')||'<div class="hint" style="padding:6px">Không còn gì</div>'}
+    <div class="gh" style="margin-top:8px"><span>Staged · ${st.length}</span>${st.length?'<button data-act="all" data-v="0">Unstage all</button>':''}</div>
+    ${st.map(dFileItem).join('')||'<div class="hint" style="padding:6px">Tick vào file để stage</div>'}
+  </div><div class="cbox">
+    <textarea id="commitMsg" placeholder="Commit message">${esc(S.msg)}</textarea>
+    <button class="tbtn pri" data-act="commit-btn" ${st.length?'':'disabled'}>Commit ${st.length} file${st.length===1?'':'s'} to feat/inventory</button>
+  </div></div><div class="diff">${dDiff(sel)}</div></div>`;}
+function graphSvg(){
+  const RH=34,LW=16,X0=14,cx=l=>X0+l*LW,cy=i=>i*RH+RH/2,col=l=>['var(--l0)','var(--l1)','var(--l2)'][l];
+  let p='';
+  for(const [a,b,merge] of EDGES){
+    const la=C[a].lane,lb=C[b].lane,x1=cx(la),y1=cy(a),x2=cx(lb),y2=cy(b),c=col(Math.max(la,lb));
+    let d;
+    if(la===lb)d=`M${x1} ${y1}L${x2} ${y2}`;
+    else if(merge)d=`M${x1} ${y1}C${x1} ${y1+RH*.6} ${x2} ${y1+RH*.4} ${x2} ${y1+RH}L${x2} ${y2}`;
+    else d=`M${x1} ${y1}L${x1} ${y2-RH}C${x1} ${y2-RH*.4} ${x2} ${y2-RH*.6} ${x2} ${y2}`;
+    p+=`<path d="${d}" stroke="${c}" stroke-width="2" fill="none"/>`;}
+  C.forEach((c,i)=>{p+= i===0
+    ?`<circle cx="${cx(c.lane)}" cy="${cy(i)}" r="5.5" fill="var(--app-bg)" stroke="${col(c.lane)}" stroke-width="2.5"/>`
+    :`<circle cx="${cx(c.lane)}" cy="${cy(i)}" r="4.5" fill="${col(c.lane)}" stroke="var(--app-bg)" stroke-width="1.5"/>`;});
+  return `<svg width="60" height="${C.length*RH}" aria-hidden="true">${p}</svg>`;}
+function refPills(c){return c.refs.map(([t,n])=>`<span class="ref ${t}">${esc(n)}</span>`).join('');}
+function fileRows(files){return files.map(([st,p,sz,fl])=>`<div class="hf"><span class="badge st-${st}">${st}</span><span>${esc(p)}</span><span>${esc(sz)}</span><span>${fl==='nolfs'?'<span class="warn">not in LFS</span>':fl==='lfs'?'<span class="ok">LFS ✓</span>':''}</span></div>`).join('');}
+function dHistory(){
+  const c=C[S.commit];
+  return `<div class="history"><div class="hlist">${graphSvg()}
+    ${C.map((c,i)=>`<div class="hrow ${S.commit===i?'sel':''}" data-act="commit" data-i="${i}"><span class="msg">${refPills(c)}<span>${esc(c.m)}</span></span><span class="au">${c.a}</span><span class="dt">${c.d}</span><span class="hs">${c.h}</span></div>`).join('')}
+  </div><div class="hdetail">
+    <h3>${esc(c.m)}</h3>
+    <div class="hmeta">${c.h} · ${c.a} · ${c.d}${c.merge?' · merge of '+c.merge:''}</div>
+    ${c.f.length?fileRows(c.f):'<div class="hmeta">Merge commit, không có thay đổi riêng.</div>'}
+  </div></div>`;}
+function dInsight(){
+  const total=TM.reduce((s,a)=>s+a[1],0);
+  const cells=squarify(TM.map(([n,v,k])=>({n,v,k})),100,52).map(r=>{
+    const big=r.w*r.h>60;
+    return `<div class="tmc" title="Assets/${esc(r.n)} · ${fmt(r.v)}" style="left:${r.x}%;top:${r.y/52*100}%;width:${r.w}%;height:${r.h/52*100}%;background:var(--tm-${r.k})">${big?`<b>${esc(r.n)}</b><span>${fmt(r.v)}</span>`:''}</div>`;}).join('');
+  const cube=`<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 21 7v10l-9 5-9-5V7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M3 7l9 5 9-5M12 12v10" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>`;
+  return `<div class="insight">
+    <div class="cards">
+      <div class="card"><span class="lb">Loại project</span><span class="v">${cube}Unity 6000.0.23f1</span><span class="s">URP · C# 312 scripts · 41 packages · đọc từ ProjectSettings/ProjectVersion.txt</span></div>
+      <div class="card"><span class="lb">Working tree</span><span class="v">${fmt(total)}</span><span class="s">1,904 files · Library/ đã ignore</span></div>
+      <div class="card"><span class="lb">Repository (.git)</span><span class="v">3.12 GB</span><span class="s">800 MB trong đó đến từ 2 file PSD</span></div>
+      <div class="card w"><span class="lb">Git LFS</span><span class="v">42 file</span><span class="s">lớn hơn 10 MB nhưng chưa track LFS</span></div>
+    </div>
+    <div class="split">
+      <div class="box"><h4>Dung lượng theo thư mục <small>Assets/ · rê chuột để xem đường dẫn</small></h4>
+        <div class="tm">${cells}</div>
+        <div class="leg">${Object.entries(CAT).map(([k,n])=>`<span><i style="background:var(--tm-${k})"></i>${n}</span>`).join('')}</div>
+      </div>
+      <div class="box"><h4>Cần chú ý</h4><div class="att">
+        <div class="ai"><span class="ic w">!</span><div><b>2 file PSD (800 MB)</b> được commit không qua LFS ở <button class="lnk" data-act="goto" data-i="5">a3f91c2</button>.
+          <div class="acts"><button class="tbtn" data-act="cmd" data-v='git lfs track "*.psd" "*.asset"'>Track *.psd, *.asset</button><button class="tbtn" data-act="cmd" data-v='git lfs migrate import --include="*.psd" --everything'>Chuyển history sang LFS…</button></div></div></div>
+        <div class="ai"><span class="ic w">!</span><div><code>UserSettings/</code> đang được commit (3 file). Unity khuyên nên ignore thư mục này.
+          <div class="acts"><button class="tbtn" data-act="cmd" data-v="echo 'UserSettings/' >> .gitignore && git rm -r --cached UserSettings">Thêm vào .gitignore</button></div></div></div>
+        <div class="ai"><span class="ic w">!</span><div><code>.DS_Store</code> bị commit ở 2 chỗ.</div></div>
+        <div class="ai"><span class="ic g">✓</span><div><code>Library/</code>, <code>Temp/</code>, <code>Logs/</code> đã được ignore đúng.</div></div>
+      </div></div>
+    </div>
+    <div class="box"><h4>File lớn nhất trong lịch sử <small>kể cả file đã xoá khỏi working tree</small></h4>
+      <table class="blobs"><thead><tr><th>File</th><th>Dung lượng</th><th>Commit</th><th>LFS</th></tr></thead><tbody>
+      ${BLOBS.map(([p,s,ci,l])=>`<tr><td class="m">${esc(p)}</td><td>${fmt(s)}</td><td><button class="lnk" data-act="goto" data-i="${ci}">${C[ci].h}</button></td><td>${l?'<span class="ok">LFS ✓</span>':'<span class="warn">not in LFS</span>'}</td></tr>`).join('')}
+      </tbody></table></div>
+  </div>`;}
+function palItems(q){q=(q||'').toLowerCase();
+  const items=PAL.filter(([t,c])=>!q||t.toLowerCase().includes(q)||c.toLowerCase().includes(q));
+  if(S.undo.length&&(!q||'undo'.includes(q)))items.unshift(['Undo last operation','operation log']);
+  return items.map(([t,c])=>`<button class="po" data-act="palrun" data-t="${esc(t)}" data-c="${esc(c)}"><span>${esc(t)}</span><code>${esc(c)}</code></button>`).join('')||'<div class="hint" style="padding:10px">Không có lệnh phù hợp</div>';}
+function desktop(){
+  const n=S.files.length;
+  const body=S.view==='changes'?dChanges():S.view==='history'?dHistory():dInsight();
+  return `<div class="win">
+  <div class="tbar"><div class="dots"><i></i><i></i><i></i></div><span class="repo">lantern-keep</span>
+    <span class="pill">⎇ feat/inventory <span class="ah">↑2</span> ↓0</span>
+    <button class="search" data-act="palette"><span>Tìm file, branch, hoặc chạy lệnh…</span><span class="k">⌘K</span></button>
+    <button class="tbtn" data-act="cmd" data-v="git fetch --all --prune">Fetch</button><button class="tbtn" data-act="cmd" data-v="git pull --rebase">Pull</button><button class="tbtn" data-act="cmd" data-v="git push -u origin feat/inventory">Push</button></div>
+  <div class="wbody">
+    <aside class="side">
+      <div><div class="sh">Repositories</div>
+        <div class="si on"><span class="dot dirty"></span>lantern-keep<span class="meta">${n}</span></div>
+        <div class="si"><span class="dot clean"></span>hm-website</div>
+        <div class="si"><span class="dot"></span>build-pipeline<span class="meta">↓3</span></div></div>
+      <div><div class="sh">Branches</div>
+        <div class="si on">⎇ feat/inventory<span class="meta">↑2</span></div>
+        <div class="si">⎇ main</div>
+        <div class="si" style="opacity:.6">⎇ fix/jump-buffer<span class="meta">merged</span></div></div>
+      <div><div class="sh">Remotes</div><div class="si">origin</div></div>
+      <div><div class="sh">Stashes</div><div class="si">WIP lighting tweaks<span class="meta">2d</span></div></div>
+      <div><div class="sh">Tags</div><div class="si">v0.3.0</div></div>
+    </aside>
+    <div class="main">
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="${S.view==='changes'}" data-act="view" data-v="changes">Changes <span class="n">${n}</span></button>
+        <button class="tab" role="tab" aria-selected="${S.view==='history'}" data-act="view" data-v="history">History</button>
+        <button class="tab" role="tab" aria-selected="${S.view==='insight'}" data-act="view" data-v="insight">Insight</button>
+      </div>
+      <div class="content">${body}</div>
+    </div>
+  </div>
+  <div class="sbar"><span class="last">› <b>${esc(S.last)}</b></span><span>Mỗi thao tác đều hiện lệnh git tương ứng</span>
+    <button data-act="undo" ${S.undo.length?'':'disabled'}>⌘Z Undo${S.undo.length?' · '+S.undo.length:''}</button></div>
+  ${S.palette?`<div class="overlay" data-act="palclose"><div class="pal" role="dialog" aria-label="Command palette"><input id="pal" placeholder="Gõ lệnh hoặc tên branch… (Esc để đóng)" autocomplete="off"><div class="pl" id="palList">${palItems('')}</div></div></div>`:''}
+  ${S.toast?`<div class="toast">${esc(S.toast)}</div>`:''}
+  </div>`;}
+
+/* ---------------- TUI ---------------- */
+function tGraph(s){return [...s].map((ch,i)=>{const l=Math.ceil(i/2);return ch===' '?' ':`<span class="${['g','m','o'][l]}">${ch}</span>`;}).join('');}
+function pane(title,body,focus,style=''){return `<div class="pane ${focus?'f':''}" style="${style}"><span class="pt">${title}</span><div class="pb">${body}</div></div>`;}
+function tDiff(f){
+  if(f.bin)return `<span class="y">Binary file</span>  ${esc(f.path)}\n18.4 KB → 21.1 KB · 128×128\n\n<span class="dm">Preview ảnh cần terminal hỗ trợ graphics protocol\n(kitty, WezTerm, iTerm2). Nhấn </span><span class="c">o</span><span class="dm"> để mở bằng app ngoài.</span>`;
+  let s=f.id==='lv'?`<span class="y">Unity scene · 1 object moved: InventoryChest (x 12.5 → 14)\n              ambient 1 → 0.85</span>\n\n`:'';
+  s+=parseDiff(DIFF[f.id]).map(r=>r.t==='h'?`<span class="c">${esc(r.text)}</span>`
+    :r.t==='add'?`<span class="dm">${String(r.n).padStart(4)}</span> <span class="g">+${esc(r.text)}</span>`
+    :r.t==='del'?`<span class="dm">${String(r.o).padStart(4)}</span> <span class="r">-${esc(r.text)}</span>`
+    :`<span class="dm">${String(r.n).padStart(4)}</span>  ${esc(r.text)}`).join('\n');
+  return s;}
+function bar(v,max,w){const full=v/max*w,n=Math.floor(full),fr=['','▏','▎','▍','▌','▋','▊','▉'][Math.round((full-n)*7)];return ('█'.repeat(n)+fr).padEnd(w,' ');}
+function tui(){
+  const v=S.view;let left='',right='';
+  if(v==='changes'){
+    const fl=orderedFiles().map(f=>{
+      const X=f.staged?`<span class="g">${f.st==='?'?'A':f.st}</span>`:' ';
+      const Y=!f.staged?`<span class="r">${f.st==='?'?'?':f.st}</span>`:' ';
+      return `<div class="tl ${S.file===f.id?'sel':''}" data-act="file" data-id="${f.id}">${X}${Y} ${esc(base(f.path))}<span class="dm">  ${esc(dir(f.path).replace('Assets/',''))}</span></div>`;}).join('');
+    left=pane('[1] Status',`<span class="g">lantern-keep</span> → <span class="m">feat/inventory</span> <span class="g">↑2</span>`,false,'flex:none')
+      +pane('[2] Files',fl,S.tFocus==='files')
+      +pane('[3] Branches',`<span class="g">*</span> <span class="m">feat/inventory</span>   <span class="g">↑2</span>\n  main\n  <span class="dm">fix/jump-buffer (merged)</span>`,false,'flex:none')
+      +pane('[4] Stash',`<span class="dm">stash@{0}</span> WIP lighting tweaks`,false,'flex:none');
+    const f=fileById(S.file);
+    right=pane(`Diff ─ ${esc(base(f.path))} ${f.staged?'<span class="g">(staged)</span>':''}`,tDiff(f),false,'height:100%');
+  }else if(v==='history'){
+    const rows=C.map((c,i)=>{
+      const refs=c.refs.map(([t,n])=>`<span class="${t==='head'?'g bo':t==='tag'?'o':t==='rm'?'dm':'m'}">(${esc(n)})</span> `).join('');
+      return `<div class="tl ${S.commit===i?'sel':''}" data-act="commit" data-i="${i}"><span class="y">${c.h}</span> ${tGraph(c.g.padEnd(5,' '))}  ${refs}${esc(c.m)}  <span class="dm">${c.a}, ${c.d}</span></div>`;}).join('');
+    const c=C[S.commit];
+    left=pane('[1] Commits',rows,true,'height:100%');
+    const files=c.f.length?c.f.map(([st,p,sz,fl])=>`<span class="${st==='A'?'g':'y'}">${st}</span> ${esc(p)}  <span class="dm">${esc(sz)}</span>${fl==='nolfs'?'  <span class="y">⚠ not in LFS</span>':fl==='lfs'?'  <span class="g">LFS</span>':''}`).join('\n'):`<span class="dm">merge of ${c.merge}</span>`;
+    right=pane(`Commit ${c.h}`,`<span class="y">commit ${c.h}</span>\nAuthor: ${c.a}\nDate:   ${c.d}\n\n    <span class="bo">${esc(c.m)}</span>\n\n${files}`,false,'height:100%');
+  }else{
+    const total=TM.reduce((s,a)=>s+a[1],0),max=TM[0][1];
+    const cls={art:'o',audio:'m',models:'b',scenes:'g',anim:'y',code:'dm'};
+    const bars=TM.map(([n,s,k])=>`${n.padEnd(20,' ')} <span class="${cls[k]}">${bar(s,max,30)}</span> ${fmt(s).padStart(9,' ')}`).join('\n');
+    left=pane('[1] Project',`<span class="g bo">◆ Unity 6000.0.23f1</span>\n  Render     URP\n  Language   C# · 312 scripts\n  Packages   41\n  <span class="dm">from ProjectSettings/ProjectVersion.txt</span>`,false,'flex:none')
+      +pane('[2] Size',`Working tree   <span class="bo">${fmt(total)}</span>\nRepo (.git)    <span class="bo">3.12 GB</span>\nFiles          1,904`,false,'flex:none')
+      +pane('[3] Health',`<span class="y">⚠</span> 42 files &gt;10 MB not in LFS\n<span class="y">⚠</span> 2 PSD (800 MB) in <span class="y">a3f91c2</span>\n<span class="y">⚠</span> UserSettings/ committed\n<span class="y">⚠</span> .DS_Store committed (2)\n<span class="g">✓</span> Library/ Temp/ Logs/ ignored\n\n<span class="dm">press</span> <span class="c">L</span> <span class="dm">to apply Unity LFS template</span>`,true);
+    const bl=BLOBS.map(([p,s,ci,l])=>`${fmt(s).padStart(7,' ')}  <span class="y">${C[ci].h}</span>  ${l?'<span class="g">LFS</span>':'<span class="y">⚠  </span>'}  ${esc(base(p))}`).join('\n');
+    right=`<div class="tcol" style="height:100%">`+pane('Assets/ by size',bars+`\n\n<span class="dm">Treemap trong terminal chỉ làm được dạng thanh khối như trên.</span>`,false)
+      +pane('Largest blobs in history',bl,false,'flex:none')+`</div>`;
+  }
+  const keys={changes:[['space','stage'],['a','stage all'],['c','commit'],['j/k','move'],['u','undo'],[':','command']],
+    history:[['j/k','move'],['enter','open'],['r','rebase -i'],['b','new branch'],[':','command']],
+    insight:[['L','LFS template'],['g','go to commit'],['i','gitignore fix'],[':','command']]}[v];
+  return `<div class="term" id="term" tabindex="0" aria-label="TUI mockup, nhấn để điều khiển bằng bàn phím">
+    <div class="ttop"><span class="nm">gitty</span><span>lantern-keep</span><span class="m">⎇ feat/inventory</span><span class="g">↑2</span>
+      <span style="margin-left:auto"></span>${VIEWS.map((x,i)=>`<span class="ttab ${v===x?'on':''}" data-act="view" data-v="${x}">${i+1} ${x[0].toUpperCase()+x.slice(1)}</span>`).join('')}</div>
+    <div class="tgrid"><div class="tcol">${left}</div><div class="tcol">${right}</div></div>
+    <div class="tbot">${keys.map(([k,l])=>`<span><span class="kk">${k}</span> ${l}</span>`).join('')}<span><span class="kk">1-3</span> view</span><span class="last">› ${esc(S.last)}</span></div>
+  </div>`;}
+
+/* ---------------- render & events ---------------- */
+const stage=document.getElementById('stage');
+function render(){
+  const tuiFocused=document.activeElement&&document.activeElement.id==='term';
+  stage.innerHTML=S.mode==='desktop'?desktop():tui();
+  document.getElementById('m-desktop').setAttribute('aria-pressed',S.mode==='desktop');
+  document.getElementById('m-tui').setAttribute('aria-pressed',S.mode==='tui');
+  document.getElementById('hint').innerHTML=S.mode==='desktop'
+    ?'Thử: tick checkbox để stage, bấm <kbd>⌘K</kbd> hoặc <kbd>Ctrl K</kbd> mở command palette, sang tab Insight.'
+    :'Bấm vào terminal rồi dùng <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> đổi màn, <kbd>j</kbd> <kbd>k</kbd> di chuyển, <kbd>space</kbd> stage, <kbd>u</kbd> undo.';
+  if(S.palette){const p=document.getElementById('pal');p&&p.focus();}
+  if(tuiFocused){const t=document.getElementById('term');t&&t.focus();}
+}
+document.addEventListener('click',e=>{
+  const el=e.target.closest('[data-act]');if(!el)return;
+  const a=el.dataset.act;
+  if(a==='palclose'&&e.target!==el)return; // clicks inside palette
+  switch(a){
+    case 'mode':S.mode=el.dataset.v;S.palette=false;render();if(S.mode==='tui')document.getElementById('term').focus();return;
+    case 'view':S.view=el.dataset.v;break;
+    case 'file':S.file=el.dataset.id;break;
+    case 'toggle':toggle(el.dataset.id);S.file=el.dataset.id;break;
+    case 'all':stageAll(el.dataset.v==='1');break;
+    case 'commit':S.commit=+el.dataset.i;break;
+    case 'goto':S.view='history';S.commit=+el.dataset.i;break;
+    case 'hunk':{const f=fileById(S.file);S.last=`git apply --cached  # hunk ${+el.dataset.i+1} of ${f.base||base(f.path)}`;toast('Đã stage 1 hunk (mockup)');break;}
+    case 'cmd':S.last=el.dataset.v;toast('Mockup: lệnh hiện ở thanh dưới');break;
+    case 'commit-btn':S.last=`git commit -m "${S.msg||'Inventory: Tab toggles panel'}"`;toast('Mockup: commit sẽ được tạo, ⌘Z để hoàn tác');break;
+    case 'undo':undo();break;
+    case 'palette':S.palette=true;break;
+    case 'palclose':S.palette=false;break;
+    case 'palrun':{const t=el.dataset.t,c=el.dataset.c;S.palette=false;
+      if(t.startsWith('Undo'))undo();else if(t==='Open Insight')S.view='insight';else{S.last=c;toast('Mockup: '+t);}break;}
+    default:return;
+  }
+  render();
+});
+document.addEventListener('input',e=>{
+  if(e.target.id==='pal')document.getElementById('palList').innerHTML=palItems(e.target.value);
+  if(e.target.id==='commitMsg')S.msg=e.target.value;
+});
+document.addEventListener('keydown',e=>{
+  if(S.mode==='desktop'){
+    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();S.palette=!S.palette;render();return;}
+    if(e.key==='Escape'&&S.palette){S.palette=false;render();return;}
+    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'&&!e.target.matches('textarea,input')&&S.undo.length){e.preventDefault();undo();render();}
+    return;}
+  if(!document.activeElement||document.activeElement.id!=='term')return;
+  const k=e.key;
+  if(['1','2','3'].includes(k))S.view=VIEWS[+k-1];
+  else if(k==='j'||k==='k'||k==='ArrowDown'||k==='ArrowUp'){
+    const d=(k==='j'||k==='ArrowDown')?1:-1;
+    if(S.view==='changes'){const o=orderedFiles(),i=o.findIndex(f=>f.id===S.file);S.file=o[Math.max(0,Math.min(o.length-1,i+d))].id;}
+    else if(S.view==='history')S.commit=Math.max(0,Math.min(C.length-1,S.commit+d));
+    else return;}
+  else if(k===' '&&S.view==='changes')toggle(S.file);
+  else if(k==='a'&&S.view==='changes')stageAll(S.files.some(f=>!f.staged));
+  else if(k==='u')undo();
+  else if(k==='g'&&S.view==='insight'){S.view='history';S.commit=5;}
+  else if(k==='L'&&S.view==='insight')S.last='git lfs track "*.psd" "*.asset" "*.tga" "*.exr"';
+  else return;
+  e.preventDefault();render();
+});
+render();
+</script>
+</body>
+</html>
