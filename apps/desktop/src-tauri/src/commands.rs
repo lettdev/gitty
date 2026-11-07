@@ -140,7 +140,7 @@ pub async fn repo_list(app: AppHandle) -> Res<Vec<RepoSummary>> {
         paths.truncate(60);
         let handles: Vec<_> = paths.into_iter().map(|p| std::thread::spawn(move || workspace::summarize(&p))).collect();
         let mut out: Vec<RepoSummary> = handles.into_iter().filter_map(|h| h.join().ok()).collect();
-        out.sort_by(|a, b| b.last_commit.cmp(&a.last_commit));
+        out.sort_by_key(|r| std::cmp::Reverse(r.last_commit));
         Ok(out)
     })
     .await

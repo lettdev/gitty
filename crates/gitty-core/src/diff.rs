@@ -329,7 +329,7 @@ impl Repo {
 
     /// Raw combined diff of a conflicted file (shown as plain text).
     pub fn diff_conflict(&self, path: &str) -> Result<String> {
-        Ok(self.git.run_text(&["diff", "--no-ext-diff", "--no-color", "--", path])?)
+        self.git.run_text(&["diff", "--no-ext-diff", "--no-color", "--", path])
     }
 }
 

@@ -19,6 +19,7 @@ fn setup() -> (tempfile::TempDir, Repo) {
     let dir = tempfile::tempdir().unwrap();
     let p = dir.path();
     git(p, &["init", "-q", "-b", "main"]);
+    git(p, &["config", "core.autocrlf", "false"]);
     git(p, &["config", "user.name", "Test"]);
     git(p, &["config", "user.email", "test@example.com"]);
     git(p, &["config", "commit.gpgsign", "false"]);
@@ -195,6 +196,7 @@ fn log_and_detail() {
 fn unborn_repo_works() {
     let dir = tempfile::tempdir().unwrap();
     git(dir.path(), &["init", "-q", "-b", "main"]);
+    git(dir.path(), &["config", "core.autocrlf", "false"]);
     git(dir.path(), &["config", "user.name", "T"]);
     git(dir.path(), &["config", "user.email", "t@example.com"]);
     fs::write(dir.path().join("a.txt"), "a\n").unwrap();

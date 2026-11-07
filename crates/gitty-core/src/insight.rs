@@ -433,7 +433,7 @@ impl Repo {
             }
             return Ok(());
         }
-        missing.sort_by(|a, b| b.1.cmp(&a.1));
+        missing.sort_by_key(|m| Reverse(m.1));
         let total: u64 = missing.iter().map(|(_, s)| s).sum();
         let mut patterns: Vec<String> = missing.iter().filter_map(|(p, _)| ext_pattern(p)).collect();
         patterns.sort();
@@ -648,7 +648,7 @@ impl Repo {
             }
         }
         let mut top: Vec<(u64, String, String)> = heap.into_iter().map(|Reverse(x)| x).collect();
-        top.sort_by(|a, b| b.0.cmp(&a.0));
+        top.sort_by_key(|t| Reverse(t.0));
         let mut by_path: Vec<Blob> = Vec::new();
         for (size, oid, path) in top {
             if by_path.iter().any(|b| b.path == path) {

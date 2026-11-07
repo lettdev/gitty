@@ -23,6 +23,7 @@ fn setup() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let p = dir.path();
     git(p, &["init", "-q", "-b", "main"]);
+    git(p, &["config", "core.autocrlf", "false"]);
     git(p, &["config", "user.name", "Hang"]);
     git(p, &["config", "user.email", "hang@example.com"]);
     git(p, &["config", "commit.gpgsign", "false"]);
@@ -211,6 +212,7 @@ fn unity_setup() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let p = dir.path();
     git(p, &["init", "-q", "-b", "main"]);
+    git(p, &["config", "core.autocrlf", "false"]);
     git(p, &["config", "user.name", "Hang"]);
     git(p, &["config", "user.email", "hang@example.com"]);
     git(p, &["config", "commit.gpgsign", "false"]);
@@ -378,6 +380,7 @@ fn repos_view_lists_sibling_repositories() {
         let p = parent.path().join(name);
         fs::create_dir_all(&p).unwrap();
         git(&p, &["init", "-q", "-b", "main"]);
+        git(&p, &["config", "core.autocrlf", "false"]);
     }
     fs::write(parent.path().join("beta/x.txt"), "x").unwrap();
     let mut app = app_for(&parent.path().join("alpha"));

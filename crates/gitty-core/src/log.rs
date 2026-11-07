@@ -239,7 +239,7 @@ mod tests {
 
     #[test]
     fn numstat_with_rename() {
-        let n = parse_numstat("1\t2\ta.txt\0-\t-\timg.png\03\t0\t\0old.rs\0new.rs\0");
+        let n = parse_numstat("1\t2\ta.txt\0-\t-\timg.png\x003\t0\t\0old.rs\0new.rs\0");
         assert_eq!(n, vec![(Some(1), Some(2)), (None, None), (Some(3), Some(0))]);
         let s = parse_name_status("M\0a.txt\0M\0img.png\0R090\0old.rs\0new.rs\0");
         assert_eq!(s[2].orig.as_deref(), Some("old.rs"));

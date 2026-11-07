@@ -20,6 +20,7 @@ fn init() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let p = dir.path();
     git(p, &["init", "-q", "-b", "main"]);
+    git(p, &["config", "core.autocrlf", "false"]);
     git(p, &["config", "user.name", "Test"]);
     git(p, &["config", "user.email", "test@example.com"]);
     git(p, &["config", "commit.gpgsign", "false"]);
