@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { CloneDialog, IgnoreDialog, SettingsDialog, loadSettings, saveSettings, type Settings } from "./components/Dialogs";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { Branch, OpResult, RepoInfo, RepoSummary, StatusDto } from "./api";
 import { api, errorText, relativeTime } from "./api";
 import { Changes, type Ctx } from "./components/Changes";
 import { History } from "./components/History";
 import { Insight } from "./components/Insight";
+import { Rebase } from "./components/Rebase";
+import type { RebaseStep } from "./api";
 
 type View = "changes" | "history" | "insight";
 interface Ask {
@@ -43,7 +47,25 @@ export default function App() {
   const [palette, setPalette] = useState(false);
   const [commitFocus, setCommitFocus] = useState(0);
   const [gotoHash, setGotoHash] = useState<string | null>(null);
+  const [rebase, setRebase] = useState<{ base: string | null; steps: RebaseStep[] } | null>(null);
   const toastTimer = useRef<number>(0);
+  const pendingRebase = useRef(false);
+  const [settings, setSettings] = useState<Settings>(loadSettings);
+  const [showSettings, setShowSettings] = useState(false);
+  const [ignore, setIgnore] = useState<{ check?: string } | null>(null);
+  const [cloning, setCloning] = useState(false);
+
+  // apply the theme to the page and to the native window frame
+  useEffect(() => {
+    saveSettings(settings);
+    const root = document.documentElement;
+    if (settings.theme === "system") delete root.dataset.theme;
+    else root.dataset.theme = settings.theme;
+    root.style.setProperty("--diff-size", `${settings.diffSize}px`);
+    getCurrentWindow()
+      .setTheme(settings.theme === "system" ? null : settings.theme)
+      .catch(() => {});
+  }, [settings]);
 
   const notify = useCallback((text: string, err = false) => {
     setToast({ text, err });
@@ -62,7 +84,21 @@ export default function App() {
 
   useEffect(() => {
     api.initialRepo().then(setRepo).catch(() => setRepo(null));
-    api.startView().then((v) => v && ["changes", "history", "insight"].includes(v) && setView(v as View));
+    // dev aid: GITTY_VIEW=history,light opens a view/dialog with a theme, without saving it
+    api.startView().then((spec) => {
+      const parts = (spec ?? "").split(",");
+      const v = parts.find((p) => ["changes", "history", "insight", "rebase"].includes(p)) ?? null;
+      const theme = parts.find((p) => p === "light" || p === "dark");
+      if (theme) document.documentElement.dataset.theme = theme;
+      if (parts.includes("settings")) setShowSettings(true);
+      if (parts.includes("ignore")) setIgnore({});
+      if (parts.includes("clone")) setCloning(true);
+      if (v && ["changes", "history", "insight"].includes(v)) setView(v as View);
+      if (v === "rebase") {
+        setView("history");
+        pendingRebase.current = true;
+      }
+    });
     const un = listen<string>("git-progress", (e) => setProgress(e.payload));
     return () => {
       un.then((f) => f());
@@ -73,6 +109,13 @@ export default function App() {
     if (!repo) return;
     setSt(null);
     refresh();
+    // dev aid: GITTY_VIEW=rebase opens the rebase editor for the last 3 commits
+    if (pendingRebase.current) {
+      pendingRebase.current = false;
+      api.log(false, 3).then((rows) => {
+        if (rows.length) api.rebasePlan(rows[rows.length - 1].commit.hash).then(setRebase).catch(() => {});
+      });
+    }
     const t = window.setInterval(() => document.visibilityState === "visible" && refresh(), 2500);
     const onFocus = () => refresh();
     window.addEventListener("focus", onFocus);
@@ -109,7 +152,7 @@ export default function App() {
     (title: string, message: string, confirm: string) => new Promise<boolean>((resolve) => setAsk({ title, message, confirm, resolve })),
     [],
   );
-  const ctx: Ctx = useMemo(() => ({ run, ask: askFn }), [run, askFn]);
+  const ctx: Ctx = useMemo(() => ({ run, ask: askFn, openIgnore: (check?: string) => setIgnore({ check }) }), [run, askFn]);
   const promptFn = (p: Omit<Prompt, "resolve">) => new Promise<string | null>((resolve) => setPrompt({ ...p, resolve }));
 
   const openFolder = async () => {
@@ -140,6 +183,13 @@ export default function App() {
       notify(errorText(e), true);
     }
   };
+  const openRebase = async (hash: string) => {
+    try {
+      setRebase(await api.rebasePlan(hash));
+    } catch (e) {
+      notify(errorText(e), true);
+    }
+  };
   const newBranch = async () => {
     const name = await promptFn({ title: "New branch from HEAD", value: "", confirm: "Create and switch" });
     if (name?.trim()) run(() => api.createBranch(name.trim(), null));
@@ -164,6 +214,12 @@ export default function App() {
       { label: "Stash changes…", cmd: "git stash push -u", run: stash },
       { label: "New branch…", cmd: "git switch -c <name>", run: newBranch },
       { label: "Open repository…", cmd: "", run: openFolder },
+      { label: "Clone repository…", cmd: "git clone <url>", run: () => setCloning(true) },
+      { label: "Ignore rules…", cmd: ".gitignore", run: () => setIgnore({}) },
+      { label: "Settings…", cmd: "⌘,", run: () => setShowSettings(true) },
+      { label: "Theme: light", cmd: "", run: () => setSettings((s) => ({ ...s, theme: "light" })) },
+      { label: "Theme: dark", cmd: "", run: () => setSettings((s) => ({ ...s, theme: "dark" })) },
+      { label: "Theme: follow the system", cmd: "", run: () => setSettings((s) => ({ ...s, theme: "system" })) },
     ];
     for (const b of branches.filter((b) => !b.head)) {
       items.push({ label: `Switch to ${b.name}`, cmd: b.remote ? `git switch --track ${b.name}` : `git switch ${b.name}`, run: () => run(() => api.switchBranch(b.name, b.remote)) });
@@ -181,6 +237,9 @@ export default function App() {
       if (mod && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setPalette((p) => !p);
+      } else if (mod && e.key === ",") {
+        e.preventDefault();
+        setShowSettings(true);
       } else if (mod && ["1", "2", "3"].includes(e.key)) {
         e.preventDefault();
         setView((["changes", "history", "insight"] as View[])[Number(e.key) - 1]);
@@ -196,14 +255,48 @@ export default function App() {
   }, [st, run]);
 
   if (repo === undefined) return <div className="welcome"><span className="spin" /></div>;
-  if (repo === null) return <Welcome onOpen={openRepo} onBrowse={openFolder} />;
+  const dialogs = (
+    <>
+      {showSettings && <SettingsDialog settings={settings} onChange={setSettings} onClose={() => setShowSettings(false)} />}
+      {cloning && (
+        <CloneDialog
+          onClose={() => setCloning(false)}
+          onDone={(r) => {
+            setCloning(false);
+            setRepo(r);
+            setView("changes");
+            notify(`Cloned ${r.name}`);
+          }}
+        />
+      )}
+    </>
+  );
+  if (repo === null)
+    return (
+      <>
+        <Welcome onOpen={openRepo} onBrowse={openFolder} onClone={() => setCloning(true)} />
+        {dialogs}
+        {toast && <div className={`toast ${toast.err ? "err" : ""}`}>{toast.text}</div>}
+      </>
+    );
 
   const b = st?.status.branch;
   const changes = st?.status.entries.length ?? 0;
   return (
     <div className="app">
       <div className="body">
-        <Sidebar repo={repo} st={st} branches={branches} onOpenRepo={openRepo} onBrowse={openFolder} run={run} onNewBranch={newBranch} />
+        <Sidebar
+          repo={repo}
+          st={st}
+          branches={branches}
+          onOpenRepo={openRepo}
+          onBrowse={openFolder}
+          onClone={() => setCloning(true)}
+          run={run}
+          onNewBranch={newBranch}
+          onIgnore={() => setIgnore({})}
+          onSettings={() => setShowSettings(true)}
+        />
         <div className="main">
           <div className="toolbar">
             <button className={`tab ${view === "changes" ? "on" : ""}`} onClick={() => setView("changes")}>
@@ -233,7 +326,7 @@ export default function App() {
             ) : view === "changes" ? (
               <Changes st={st} ctx={ctx} focusCommit={commitFocus} />
             ) : view === "history" ? (
-              <History key={gotoHash ?? "h"} fingerprint={st.fingerprint} onReword={reword} select={gotoHash} />
+              <History key={(gotoHash ?? "h") + settings.allBranches} fingerprint={st.fingerprint} onReword={reword} onRebase={openRebase} select={gotoHash} allByDefault={settings.allBranches} />
             ) : (
               <Insight ctx={ctx} fingerprint={st.fingerprint} onGotoCommit={(h) => { setGotoHash(h); setView("history"); }} />
             )}
@@ -247,6 +340,18 @@ export default function App() {
           ⌘Z Undo
         </button>
       </div>
+      {rebase && (
+        <Rebase
+          initial={rebase.steps}
+          onCancel={() => setRebase(null)}
+          onRun={async (steps) => {
+            const base = rebase.base;
+            setRebase(null);
+            const ok = await run(() => api.runRebase(base, steps));
+            if (!ok) setView("changes");
+          }}
+        />
+      )}
       {palette && <Palette items={paletteItems} onClose={() => setPalette(false)} />}
       {ask && (
         <div className="overlay" onClick={() => { ask.resolve(false); setAsk(null); }}>
@@ -259,20 +364,25 @@ export default function App() {
           </div>
         </div>
       )}
+      {dialogs}
+      {ignore && <IgnoreDialog ctx={ctx} checkPath={ignore.check} onClose={() => setIgnore(null)} />}
       {prompt && <PromptDialog p={prompt} onDone={(v) => { prompt.resolve(v); setPrompt(null); }} />}
       {toast && <div className={`toast ${toast.err ? "err" : ""}`}>{toast.text}</div>}
     </div>
   );
 }
 
-function Sidebar({ repo, st, branches, onOpenRepo, onBrowse, run, onNewBranch }: {
+function Sidebar({ repo, st, branches, onOpenRepo, onBrowse, onClone, run, onNewBranch, onIgnore, onSettings }: {
   repo: RepoInfo;
   st: StatusDto | null;
   branches: Branch[];
   onOpenRepo: (p: string) => void;
   onBrowse: () => void;
+  onClone: () => void;
   run: (op: () => Promise<OpResult>) => Promise<boolean>;
   onNewBranch: () => void;
+  onIgnore: () => void;
+  onSettings: () => void;
 }) {
   const [repos, setRepos] = useState<RepoSummary[]>([]);
   useEffect(() => {
@@ -283,7 +393,13 @@ function Sidebar({ repo, st, branches, onOpenRepo, onBrowse, run, onNewBranch }:
   return (
     <aside className="side">
       <div>
-        <h3>Repositories <button onClick={onBrowse}>Open…</button></h3>
+        <h3>
+          Repositories
+          <span className="row" style={{ gap: 10 }}>
+            <button onClick={onClone}>Clone…</button>
+            <button onClick={onBrowse}>Open…</button>
+          </span>
+        </h3>
         {repos.slice(0, 12).map((r) => (
           <button key={r.path} className={`si ${r.path === repo.root ? "on" : ""}`} onClick={() => onOpenRepo(r.path)} title={r.path}>
             <span className={`dot ${r.conflicts ? "conflict" : r.changes ? "dirty" : "clean"}`} />
@@ -313,6 +429,11 @@ function Sidebar({ repo, st, branches, onOpenRepo, onBrowse, run, onNewBranch }:
           ))}
         </div>
       )}
+      <div>
+        <h3>This repository</h3>
+        <button className="si" onClick={onIgnore}><span className="grow">Ignore rules…</span></button>
+        <button className="si" onClick={onSettings}><span className="grow">Settings…</span><span className="sm">⌘,</span></button>
+      </div>
       {st && st.stashes.length > 0 && (
         <div>
           <h3>Stashes</h3>
@@ -391,7 +512,7 @@ function PromptDialog({ p, onDone }: { p: Prompt; onDone: (v: string | null) => 
   );
 }
 
-function Welcome({ onOpen, onBrowse }: { onOpen: (p: string) => void; onBrowse: () => void }) {
+function Welcome({ onOpen, onBrowse, onClone }: { onOpen: (p: string) => void; onBrowse: () => void; onClone: () => void }) {
   const [repos, setRepos] = useState<RepoSummary[] | null>(null);
   useEffect(() => {
     api.repoList().then(setRepos).catch(() => setRepos([]));
@@ -400,8 +521,11 @@ function Welcome({ onOpen, onBrowse }: { onOpen: (p: string) => void; onBrowse: 
     <div className="welcome">
       <div className="box">
         <h1>Open a repository</h1>
-        <p className="muted" style={{ margin: 0 }}>Pick a folder that contains a git repository, or one you opened before.</p>
-        <div><button className="btn primary" onClick={onBrowse}>Choose folder…</button></div>
+        <p className="muted" style={{ margin: 0 }}>Pick a folder that contains a git repository, clone one from a URL, or reopen a recent one.</p>
+        <div className="row">
+          <button className="btn primary" onClick={onBrowse}>Choose folder…</button>
+          <button className="btn" onClick={onClone}>Clone from URL…</button>
+        </div>
         {repos && repos.length > 0 && (
           <div className="list">
             {repos.map((r) => (

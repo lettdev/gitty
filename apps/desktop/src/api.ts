@@ -173,6 +173,47 @@ export interface OpResult {
   message: string;
 }
 
+export type RebaseAction = "Pick" | "Reword" | "Squash" | "Fixup" | "Drop";
+export interface RebaseStep {
+  hash: string;
+  subject: string;
+  action: RebaseAction;
+  message: string | null;
+  pushed: boolean;
+}
+export interface ConflictRegion {
+  start: number;
+  end: number;
+  ours: string[];
+  base: string[] | null;
+  theirs: string[];
+  ours_label: string;
+  theirs_label: string;
+}
+export interface ConflictFile {
+  lines: string[];
+  regions: ConflictRegion[];
+}
+
+export interface IgnoreRule {
+  line: number;
+  text: string;
+  comment: boolean;
+}
+export interface IgnoreSource {
+  label: string;
+  rel: string | null;
+  abs: string;
+  exists: boolean;
+  rules: IgnoreRule[];
+}
+export interface WhyIgnored {
+  source: string;
+  line: number;
+  pattern: string;
+  negated: boolean;
+}
+
 export type Section = "conflicts" | "unstaged" | "staged";
 
 export const api = {
@@ -207,6 +248,22 @@ export const api = {
   insight: () => invoke<Insight>("insight"),
   largestBlobs: (force: boolean) => invoke<Blob[]>("largest_blobs", { force }),
   applyFix: (fix: object) => invoke<OpResult>("apply_fix", { fix }),
+  rebasePlan: (hash: string) => invoke<{ base: string | null; steps: RebaseStep[] }>("rebase_plan", { hash }),
+  runRebase: (base: string | null, steps: RebaseStep[]) => invoke<OpResult>("run_rebase", { base, steps }),
+  readConflict: (path: string) => invoke<ConflictFile>("read_conflict", { path }),
+  resolveRegion: (path: string, region: number, pick: "ours" | "theirs" | "both" | "base") =>
+    invoke<OpResult>("resolve_region", { path, region, pick }),
+  conflictFileOp: (path: string, op: "ours" | "theirs" | "delete" | "base") => invoke<OpResult>("conflict_file_op", { path, op }),
+  ignoreSources: () => invoke<IgnoreSource[]>("ignore_sources"),
+  whyIgnored: (path: string) => invoke<WhyIgnored | null>("why_ignored", { path }),
+  addIgnore: (rel: string, pattern: string, untrack: string[]) => invoke<OpResult>("add_ignore", { rel, pattern, untrack }),
+  removeIgnore: (rel: string, line: number, text: string) => invoke<OpResult>("remove_ignore", { rel, line, text }),
+  readTextFile: (rel: string) => invoke<string>("read_text_file", { rel }),
+  writeIgnoreFile: (rel: string, text: string) => invoke<OpResult>("write_ignore_file", { rel, text }),
+  cloneDefaults: () => invoke<{ parent: string }>("clone_defaults"),
+  cloneName: (url: string) => invoke<string>("clone_name", { url }),
+  cloneRepo: (url: string, parent: string, name: string) => invoke<RepoInfo>("clone_repo", { url, parent, name }),
+  operation: (op: "continue" | "abort" | "skip") => invoke<OpResult>("operation", { op }),
 };
 
 export function humanSize(bytes: number): string {

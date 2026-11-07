@@ -569,3 +569,194 @@ pub async fn apply_fix(state: State<'_, AppState>, fix: serde_json::Value) -> Re
     })
     .await
 }
+
+// ------------------------------------------------------------------ rebase
+
+#[derive(serde::Deserialize)]
+pub struct StepIn {
+    hash: String,
+    subject: String,
+    action: String,
+    message: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct PlanDto {
+    base: Option<String>,
+    steps: Vec<gitty_core::rebase::RebaseStep>,
+}
+
+/// Commits from `hash` (inclusive) to HEAD, oldest first.
+#[tauri::command]
+pub async fn rebase_plan(state: State<'_, AppState>, hash: String) -> Res<PlanDto> {
+    let repo = current(&state)?;
+    blocking(move || {
+        if repo.state() != RepoState::Clean {
+            return Err("Finish or abort the current merge/rebase first.".into());
+        }
+        if !repo.git().succeeds(&["merge-base", "--is-ancestor", &hash, "HEAD"]) {
+            return Err(format!("{} isn't on the current branch.", &hash[..hash.len().min(7)]));
+        }
+        let parents = repo.git().run_text(&["rev-list", "--parents", "-n", "1", &hash]).map_err(err)?;
+        let base = parents.split_whitespace().nth(1).map(str::to_string);
+        let steps = repo.rebase_plan(base.as_deref()).map_err(err)?;
+        Ok(PlanDto { base, steps })
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn run_rebase(state: State<'_, AppState>, base: Option<String>, steps: Vec<StepIn>) -> Res<OpResult> {
+    use gitty_core::rebase::{RebaseAction, RebaseStep};
+    let repo = current(&state)?;
+    blocking(move || {
+        let steps: Vec<RebaseStep> = steps
+            .into_iter()
+            .map(|s| RebaseStep {
+                action: match s.action.as_str() {
+                    "Reword" => RebaseAction::Reword,
+                    "Squash" => RebaseAction::Squash,
+                    "Fixup" => RebaseAction::Fixup,
+                    "Drop" => RebaseAction::Drop,
+                    _ => RebaseAction::Pick,
+                },
+                hash: s.hash,
+                subject: s.subject,
+                message: s.message,
+                pushed: false,
+            })
+            .collect();
+        ok(repo.run_rebase(base.as_deref(), &steps).map_err(err)?, "Rebased — undo to go back")
+    })
+    .await
+}
+
+// ------------------------------------------------------------------ conflicts
+
+#[tauri::command]
+pub async fn read_conflict(state: State<'_, AppState>, path: String) -> Res<gitty_core::conflict::ConflictFile> {
+    let repo = current(&state)?;
+    blocking(move || repo.read_conflict(&path).map_err(err)).await
+}
+
+#[tauri::command]
+pub async fn resolve_region(state: State<'_, AppState>, path: String, region: usize, pick: String) -> Res<OpResult> {
+    use gitty_core::conflict::{self, Pick};
+    let repo = current(&state)?;
+    blocking(move || {
+        let pick = match pick.as_str() {
+            "ours" => Pick::Ours,
+            "theirs" => Pick::Theirs,
+            "both" => Pick::Both,
+            "base" => Pick::Base,
+            other => return Err(format!("unknown side {other}")),
+        };
+        let cf = repo.read_conflict(&path).map_err(err)?;
+        let text = conflict::resolve(&cf, region, pick).ok_or("That conflict is gone or has no original version.")?;
+        let what = format!("Resolved conflict {}", region + 1);
+        ok(repo.write_resolution(&path, &text, &what).map_err(err)?, what)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn conflict_file_op(state: State<'_, AppState>, path: String, op: String) -> Res<OpResult> {
+    let repo = current(&state)?;
+    blocking(move || match op.as_str() {
+        "ours" => ok(repo.take_side(&path, true).map_err(err)?, "Kept our version"),
+        "theirs" => ok(repo.take_side(&path, false).map_err(err)?, "Kept their version"),
+        "delete" => ok(repo.resolve_delete(&path).map_err(err)?, "Deleted the file"),
+        "base" => ok(repo.show_conflict_base(&path).map_err(err)?, "Showing the original between the sides"),
+        other => Err(format!("unknown operation {other}")),
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn operation(state: State<'_, AppState>, op: String) -> Res<OpResult> {
+    let repo = current(&state)?;
+    blocking(move || match op.as_str() {
+        "continue" => ok(repo.continue_operation().map_err(err)?, "Continued"),
+        "abort" => ok(repo.abort_operation().map_err(err)?, "Aborted"),
+        "skip" => ok(repo.skip_operation().map_err(err)?, "Skipped the commit"),
+        other => Err(format!("unknown operation {other}")),
+    })
+    .await
+}
+
+// ------------------------------------------------------------------ ignore rules
+
+#[tauri::command]
+pub async fn ignore_sources(state: State<'_, AppState>) -> Res<Vec<gitty_core::ignore::IgnoreSource>> {
+    let repo = current(&state)?;
+    blocking(move || repo.ignore_sources().map_err(err)).await
+}
+
+#[tauri::command]
+pub async fn why_ignored(state: State<'_, AppState>, path: String) -> Res<Option<gitty_core::ignore::WhyIgnored>> {
+    let repo = current(&state)?;
+    blocking(move || repo.why_ignored(&path).map_err(err)).await
+}
+
+#[tauri::command]
+pub async fn add_ignore(state: State<'_, AppState>, rel: String, pattern: String, untrack: Vec<String>) -> Res<OpResult> {
+    let repo = current(&state)?;
+    blocking(move || ok(repo.add_ignore_rule(&rel, &pattern, &untrack).map_err(err)?, format!("Added {pattern} to {rel}"))).await
+}
+
+#[tauri::command]
+pub async fn remove_ignore(state: State<'_, AppState>, rel: String, line: usize, text: String) -> Res<OpResult> {
+    let repo = current(&state)?;
+    blocking(move || ok(repo.remove_ignore_rule(&rel, line, &text).map_err(err)?, format!("Removed {text}"))).await
+}
+
+#[tauri::command]
+pub async fn read_text_file(state: State<'_, AppState>, rel: String) -> Res<String> {
+    let repo = current(&state)?;
+    blocking(move || Ok(std::fs::read_to_string(repo.root().join(&rel)).unwrap_or_default())).await
+}
+
+#[tauri::command]
+pub async fn write_ignore_file(state: State<'_, AppState>, rel: String, text: String) -> Res<OpResult> {
+    let repo = current(&state)?;
+    blocking(move || ok(repo.write_ignore_file(&rel, &text).map_err(err)?, format!("Saved {rel}"))).await
+}
+
+// ------------------------------------------------------------------ clone
+
+#[derive(Serialize)]
+pub struct CloneDefaults {
+    parent: String,
+}
+
+/// Where new clones go by default: next to the open repository, or the home folder.
+#[tauri::command]
+pub async fn clone_defaults(app: AppHandle, state: State<'_, AppState>) -> Res<CloneDefaults> {
+    let from_repo = current(&state).ok().and_then(|r| r.root().parent().map(Path::to_path_buf));
+    let from_recent = load_recent(&app).first().and_then(|r| Path::new(r).parent().map(Path::to_path_buf));
+    let home = app.path().home_dir().ok();
+    let parent = from_repo.or(from_recent).or(home).unwrap_or_else(|| PathBuf::from("."));
+    Ok(CloneDefaults { parent: parent.display().to_string() })
+}
+
+#[tauri::command]
+pub fn clone_name(url: String) -> String {
+    workspace::clone_dir_name(&url)
+}
+
+#[tauri::command]
+pub async fn clone_repo(app: AppHandle, state: State<'_, AppState>, url: String, parent: String, name: String) -> Res<RepoInfo> {
+    let app2 = app.clone();
+    let target = blocking(move || {
+        workspace::clone_repo(&url, Path::new(&parent), name.trim(), emit_progress(&app2)).map_err(|e| {
+            let text = err(e);
+            if text.contains("could not read Username") || text.contains("Authentication failed") || text.contains("Permission denied") {
+                format!("{text}\n\nGit couldn't sign in. For private repositories, set up a credential helper (HTTPS) or an SSH key, or clone once from the terminal.")
+            } else {
+                text
+            }
+        })
+    })
+    .await?;
+    open(&app, &state, &target)
+}

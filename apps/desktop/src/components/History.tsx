@@ -2,13 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CommitDetail, DiffDto, LogRow } from "../api";
 import { api, relativeTime, splitPath } from "../api";
 import { DiffView } from "./DiffView";
-import { CELL_W, GraphRow, ROW_H } from "./Graph";
+import { CELL_W, GRAPH_PAD, GraphRow, ROW_H } from "./Graph";
 
 const PAGE = 600;
 const MAX_CELLS = 24;
 
-export function History({ fingerprint, onReword, select }: { fingerprint: string; onReword: (hash: string) => void; select?: string | null }) {
-  const [all, setAll] = useState(true);
+export function History({ fingerprint, onReword, onRebase, select, allByDefault }: { fingerprint: string; onReword: (hash: string) => void; onRebase: (hash: string) => void; select?: string | null; allByDefault: boolean }) {
+  const [all, setAll] = useState(allByDefault);
   const [limit, setLimit] = useState(PAGE);
   const [rows, setRows] = useState<LogRow[]>([]);
   const [sel, setSel] = useState<string | null>(select ?? null);
@@ -76,6 +76,7 @@ export function History({ fingerprint, onReword, select }: { fingerprint: string
       if (e.key === "j" || e.key === "ArrowDown") n = Math.min(rows.length - 1, i + 1);
       else if (e.key === "k" || e.key === "ArrowUp") n = Math.max(0, i - 1);
       else if (e.key === "e" && selected) return onReword(selected.commit.hash);
+      else if (e.key === "r" && selected) return onRebase(selected.commit.hash);
       else return;
       e.preventDefault();
       setSel(rows[n].commit.hash);
@@ -91,7 +92,7 @@ export function History({ fingerprint, onReword, select }: { fingerprint: string
   });
 
   const cells = useMemo(() => Math.min(MAX_CELLS, Math.max(2, ...rows.map((r) => r.cells.length))), [rows]);
-  const graphW = cells * CELL_W + 8;
+  const graphW = cells * CELL_W + GRAPH_PAD * 2;
   const first = Math.max(0, Math.floor(scroll / ROW_H) - 10);
   const last = Math.min(rows.length, Math.ceil((scroll + height) / ROW_H) + 10);
   const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -156,6 +157,9 @@ export function History({ fingerprint, onReword, select }: { fingerprint: string
                 <h2 style={{ flex: 1 }}>{detail.message.split("\n")[0]}</h2>
                 <button className="btn small" onClick={() => onReword(detail.hash)} title="Edit message (e)">
                   Edit message
+                </button>
+                <button className="btn small" onClick={() => onRebase(detail.hash)} title="Reorder, squash or drop commits from here up (r)">
+                  Rebase from here…
                 </button>
               </div>
               <span className="muted mono" style={{ fontSize: 12 }}>

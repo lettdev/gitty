@@ -1,0 +1,95 @@
+name: Release
+
+# Push a tag like v0.2.0 to build portable downloads (no installers) and attach
+# them to a draft GitHub release:
+#   macOS (Apple silicon): Gitty.app zipped, gitty terminal binary
+#   Windows (x64):         Gitty.exe, gitty.exe terminal binary
+# macOS signing only happens when the Apple secrets exist; see docs/RELEASING.md.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macOS (Apple silicon), os: macos-latest, platform: macos-arm64 }
+          - { name: Windows (x64), os: windows-latest, platform: windows-x64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      # Only export signing variables that are actually configured: an empty
+      # APPLE_CERTIFICATE would make the bundler fail instead of skipping signing.
+      - name: Signing configuration
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            if [ -n "${!v}" ]; then
+              { echo "$v<<EOF"; echo "${!v}"; echo "EOF"; } >> "$GITHUB_ENV"
+            fi
+          done
+          if [ -z "$APPLE_CERTIFICATE" ]; then echo "::warning::No Apple certificate configured — Gitty.app will be unsigned."; fi
+
+      - name: Terminal app
+        run: cargo build --release --locked -p gitty-tui
+
+      - name: Desktop app
+        working-directory: apps/desktop
+        shell: bash
+        run: |
+          npm ci
+          if [ "$RUNNER_OS" = macOS ]; then
+            npx tauri build --bundles app
+          else
+            npx tauri build --no-bundle
+          fi
+
+      - name: Package
+        shell: bash
+        run: |
+          v="${GITHUB_REF_NAME}"
+          p="${{ matrix.platform }}"
+          mkdir dist
+          if [ "$RUNNER_OS" = macOS ]; then
+            ditto -c -k --keepParent target/release/bundle/macos/Gitty.app "dist/Gitty-$v-$p.zip"
+            mkdir "gitty-$v-$p" && cp target/release/gitty README.md config.example.toml "gitty-$v-$p"/
+            tar czf "dist/gitty-$v-$p.tar.gz" "gitty-$v-$p"
+          else
+            cp target/release/gitty-desktop.exe "dist/Gitty-$v-$p.exe"
+            mkdir "gitty-$v-$p" && cp target/release/gitty.exe README.md config.example.toml "gitty-$v-$p"/
+            7z a "dist/gitty-$v-$p.zip" "gitty-$v-$p" > /dev/null
+          fi
+          cd dist
+          for f in *; do
+            if command -v shasum > /dev/null; then shasum -a 256 "$f" > "$f.sha256"; else sha256sum "$f" > "$f.sha256"; fi
+          done
+          ls -la
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          name: Gitty ${{ github.ref_name }}
+          files: dist/*

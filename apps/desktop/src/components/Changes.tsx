@@ -1,11 +1,41 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DiffDto, OpResult, Section, StatusDto, StatusEntry } from "../api";
 import { api, splitPath } from "../api";
+import { Conflict, OperationBanner } from "./Conflict";
 import { DiffView } from "./DiffView";
 
 export interface Ctx {
   run: (op: () => Promise<OpResult>) => Promise<boolean>;
   ask: (title: string, message: string, confirm: string) => Promise<boolean>;
+  /** Open the ignore rules dialog, optionally answering "why is this path ignored?". */
+  openIgnore: (checkPath?: string) => void;
+}
+
+interface IgnoreChoice {
+  pattern: string;
+  label: string;
+  untrack: string[];
+}
+
+/** Ways to ignore a path, most specific first (mirrors the terminal app). */
+function ignoreChoices(path: string, tracked: boolean): IgnoreChoice[] {
+  const trimmed = path.replace(/\/$/, "");
+  const i = trimmed.lastIndexOf("/");
+  const dir = i >= 0 ? trimmed.slice(0, i) : null;
+  const name = i >= 0 ? trimmed.slice(i + 1) : trimmed;
+  const un = (spec: string) => (tracked ? [spec] : []);
+  if (path.endsWith("/")) {
+    return [
+      { pattern: `/${trimmed}/`, label: "This folder", untrack: un(trimmed) },
+      { pattern: `${name}/`, label: `Every folder named ${name}`, untrack: un(`:(glob)**/${name}`) },
+    ];
+  }
+  const out: IgnoreChoice[] = [{ pattern: `/${trimmed}`, label: "Only this file", untrack: un(trimmed) }];
+  const dot = name.lastIndexOf(".");
+  if (dot > 0) out.push({ pattern: `*${name.slice(dot)}`, label: `Every ${name.slice(dot)} file`, untrack: un(`:(glob)**/*${name.slice(dot)}`) });
+  if (dir) out.push({ pattern: `/${dir}/`, label: `The whole ${dir}/ folder`, untrack: un(dir) });
+  out.push({ pattern: name, label: `Every file named ${name}`, untrack: un(`:(glob)**/${name}`) });
+  return out;
 }
 
 interface Row {
@@ -36,6 +66,17 @@ export function Changes({ st, ctx, focusCommit }: { st: StatusDto; ctx: Ctx; foc
   const [sel, setSel] = useState<{ section: Section; path: string } | null>(null);
   const current = all.find((r) => r.section === sel?.section && r.entry.path === sel?.path) ?? all[0] ?? null;
 
+  const [menu, setMenu] = useState<{ x: number; y: number; row: Row } | null>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    window.addEventListener("click", close);
+    window.addEventListener("blur", close);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("blur", close);
+    };
+  }, [menu]);
   const [dto, setDto] = useState<DiffDto | null>(null);
   const [loading, setLoading] = useState(false);
   useEffect(() => {
@@ -112,9 +153,10 @@ export function Changes({ st, ctx, focusCommit }: { st: StatusDto; ctx: Ctx; foc
               onClick={() => setSel({ section: r.section, path: r.entry.path })}
               onContextMenu={(e) => {
                 e.preventDefault();
-                discard(r);
+                setSel({ section: r.section, path: r.entry.path });
+                setMenu({ x: Math.min(e.clientX, window.innerWidth - 300), y: Math.min(e.clientY, window.innerHeight - 320), row: r });
               }}
-              title="Right-click to discard"
+              title="Right-click for more"
             >
               <button
                 className={`cb ${r.section === "staged" ? "on" : ""}`}
@@ -140,7 +182,9 @@ export function Changes({ st, ctx, focusCommit }: { st: StatusDto; ctx: Ctx; foc
 
   const verb = current?.section === "staged" ? "Unstage" : "Stage";
   return (
-    <div className="split" style={{ gridTemplateColumns: "320px 1fr" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    {st.state_label && <OperationBanner label={st.state_label} conflicts={rows.conflicts.length} ctx={ctx} />}
+    <div className="split" style={{ gridTemplateColumns: "320px 1fr", flex: 1 }}>
       <div className="panel">
         <div className="scroll">
           {all.length === 0 && (
@@ -154,13 +198,44 @@ export function Changes({ st, ctx, focusCommit }: { st: StatusDto; ctx: Ctx; foc
         </div>
         <CommitBox st={st} ctx={ctx} focus={focusCommit} />
       </div>
+      {menu && (
+        <div className="ctxmenu" style={{ left: menu.x, top: menu.y }} onClick={(e) => e.stopPropagation()} role="menu">
+          {menu.row.section !== "conflicts" && (
+            <button onClick={() => { setMenu(null); toggle(menu.row); }}>
+              {menu.row.section === "staged" ? "Unstage" : "Stage"} <code>space</code>
+            </button>
+          )}
+          {menu.row.section !== "conflicts" && (
+            <button className="danger" onClick={() => { setMenu(null); discard(menu.row); }}>Discard changes…</button>
+          )}
+          <hr />
+          <div className="label">Ignore</div>
+          {ignoreChoices(menu.row.entry.path, menu.row.entry.kind !== "Untracked").map((c) => (
+            <button
+              key={c.pattern}
+              onClick={() => {
+                setMenu(null);
+                ctx.run(() => api.addIgnore(".gitignore", c.pattern, c.untrack));
+              }}
+            >
+              {c.label} <code>{c.pattern}</code>
+            </button>
+          ))}
+          <button onClick={() => { setMenu(null); ctx.openIgnore(menu.row.entry.path); }}>Ignore rules…</button>
+          <hr />
+          <button onClick={() => { setMenu(null); navigator.clipboard?.writeText(menu.row.entry.path).catch(() => {}); }}>Copy path</button>
+        </div>
+      )}
+      {current?.section === "conflicts" ? (
+        <Conflict entry={current.entry} ctx={ctx} fingerprint={st.fingerprint + JSON.stringify(current.entry)} />
+      ) : (
       <DiffView
         title={current ? splitPath(current.entry.path)[0] : "Diff"}
         sub={current ? splitPath(current.entry.path)[1] : undefined}
         dto={dto}
         loading={loading}
         actions={
-          current && current.section !== "conflicts"
+          current
             ? {
                 verb,
                 onApply: (lines) => ctx.run(() => api.applyLines(current.entry.path, current.section, lines, false)),
@@ -176,6 +251,8 @@ export function Changes({ st, ctx, focusCommit }: { st: StatusDto; ctx: Ctx; foc
             : undefined
         }
       />
+      )}
+    </div>
     </div>
   );
 }

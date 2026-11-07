@@ -2,7 +2,9 @@
 // grid the terminal UI prints) as smooth SVG lines.
 import type { Cell } from "../api";
 
-export const CELL_W = 8;
+export const CELL_W = 10;
+/** Space before the first lane so the HEAD ring isn't clipped. */
+export const GRAPH_PAD = 12;
 export const ROW_H = 30;
 const LANES = ["var(--accent)", "var(--violet)", "var(--orange)", "var(--info)", "var(--cyan)", "var(--del)"];
 
@@ -16,7 +18,7 @@ export function GraphRow({ cells, prev, next, head, width }: { cells: Cell[]; pr
   const paths: { d: string; c: string }[] = [];
   let dot: { x: number; c: string } | null = null;
   cells.forEach((cell, i) => {
-    const x0 = i * CELL_W;
+    const x0 = GRAPH_PAD + i * CELL_W;
     const x1 = x0 + CELL_W;
     const cx = x0 + CELL_W / 2;
     const c = LANES[cell.lane % LANES.length];

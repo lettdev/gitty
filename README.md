@@ -7,6 +7,13 @@ gitty            # mở repo chứa thư mục hiện tại
 gitty ~/code/x   # mở repo khác
 ```
 
+## Tải về
+
+Ở trang [Releases](https://github.com/lettdev/gitty/releases):
+- **macOS (Apple Silicon):** `Gitty-…-macos-arm64.zip`, giải nén ra `Gitty.app`. Lần đầu mở: chuột phải → **Open**.
+- **Windows (x64):** `Gitty-…-windows-x64.exe`, chạy thẳng.
+- **Bản terminal:** `gitty-…-macos-arm64.tar.gz` hoặc `gitty-…-windows-x64.zip`.
+
 ## Cài từ source
 
 Cần Rust ≥ 1.85 và `git` có sẵn trong PATH.
@@ -114,7 +121,7 @@ Chạy thử (cần Node ≥ 20):
 cd apps/desktop
 npm install
 npm run tauri dev        # chế độ phát triển, tự reload khi sửa code
-npm run tauri build      # build Gitty.app / .dmg (macOS), .msi (Windows)
+npm run tauri build      # build Gitty.app (macOS)
 ```
 
 ## Cấu trúc

@@ -19,6 +19,15 @@ pub struct GraphBuilder {
     lanes: Vec<Option<String>>,
 }
 
+/// When a lane both ends (╯) and a new one starts (╮) in the same cell, draw a tee.
+fn join_end(old: char, new: char) -> char {
+    match (old, new) {
+        ('╯', '╮') | ('╮', '╯') | ('┤', '╮') | ('┤', '╯') => '┤',
+        ('╰', '╭') | ('╭', '╰') | ('├', '╭') | ('├', '╰') => '├',
+        _ => new,
+    }
+}
+
 fn cross(ch: char) -> char {
     match ch {
         ' ' | '─' => '─',
@@ -93,7 +102,8 @@ impl GraphBuilder {
                     *cell = Cell { ch: cross(cell.ch), lane: target as u16 };
                 }
             }
-            cells[2 * target] = Cell { ch: if target > col { right } else { left }, lane: target as u16 };
+            let end = if target > col { right } else { left };
+            cells[2 * target] = Cell { ch: join_end(cells[2 * target].ch, end), lane: target as u16 };
         };
         let mut targets: Vec<(usize, char, char)> = Vec::new();
         targets.extend(merged_in.iter().map(|&i| (i, '╯', '╰')));
@@ -144,6 +154,17 @@ mod tests {
             .map(|x| row(&g.push(x)))
             .collect();
         assert_eq!(rows, vec!["●─╮", "│ ●", "● │", "●─╯"]);
+    }
+
+    #[test]
+    fn lane_that_ends_and_restarts_in_one_cell_becomes_a_tee() {
+        // x and y both sit on m; m is a merge whose second parent reuses y's lane
+        let mut g = GraphBuilder::new();
+        let rows: Vec<String> = [c("x", &["m"]), c("y", &["m"]), c("m", &["p", "q"]), c("q", &["p"]), c("p", &[])]
+            .iter()
+            .map(|x| row(&g.push(x)))
+            .collect();
+        assert_eq!(rows, vec!["●", "│ ●", "●─┤", "│ ●", "●─╯"]);
     }
 
     #[test]

@@ -21,6 +21,25 @@ pub struct RepoSummary {
     pub error: Option<String>,
 }
 
+/// The folder name `git clone` would pick for `url`.
+pub fn clone_dir_name(url: &str) -> String {
+    let trimmed = url.trim().trim_end_matches('/').trim_end_matches(".git");
+    let name = trimmed.rsplit(['/', ':', '\\']).next().unwrap_or("repo");
+    if name.is_empty() { "repo".into() } else { name.to_string() }
+}
+
+/// Clone `url` into `parent/name`, reporting progress. Returns the new folder.
+pub fn clone_repo(url: &str, parent: &Path, name: &str, on_line: impl FnMut(&str)) -> crate::Result<PathBuf> {
+    let target = parent.join(name);
+    if target.exists() && std::fs::read_dir(&target).map(|mut d| d.next().is_some()).unwrap_or(true) {
+        return Err(crate::Error::Msg(format!("{} already exists and isn't empty.", target.display())));
+    }
+    std::fs::create_dir_all(parent)?;
+    let git = crate::git::Git::new(parent);
+    git.run_streaming(&["clone", "--progress", "--", url.trim(), name], on_line)?;
+    Ok(target)
+}
+
 /// Repositories under `roots`, at most `max_depth` folders deep.
 /// Does not descend into a repository once found.
 pub fn find_repos(roots: &[PathBuf], max_depth: usize) -> Vec<PathBuf> {
@@ -90,6 +109,29 @@ pub fn summarize(path: &Path) -> RepoSummary {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn clone_names() {
+        assert_eq!(clone_dir_name("https://github.com/me/gitty.git"), "gitty");
+        assert_eq!(clone_dir_name("git@github.com:me/My-Game.git/"), "My-Game");
+        assert_eq!(clone_dir_name("/local/path/repo"), "repo");
+    }
+
+    #[test]
+    fn clone_a_local_repo() {
+        let d = tempfile::tempdir().unwrap();
+        let src = d.path().join("src");
+        std::fs::create_dir_all(&src).unwrap();
+        let run = |args: &[&str]| assert!(std::process::Command::new("git").current_dir(&src).args(args).status().unwrap().success());
+        run(&["init", "-q", "-b", "main"]);
+        std::fs::write(src.join("a.txt"), "a").unwrap();
+        run(&["add", "."]);
+        run(&["-c", "user.name=T", "-c", "user.email=t@e.com", "commit", "-q", "-m", "x"]);
+        let mut lines = 0;
+        let out = clone_repo(src.to_str().unwrap(), &d.path().join("dest"), "copy", |_| lines += 1).unwrap();
+        assert!(out.join("a.txt").exists());
+        assert!(clone_repo(src.to_str().unwrap(), &d.path().join("dest"), "copy", |_| {}).is_err(), "won't clone over a folder");
+    }
 
     #[test]
     fn finds_nested_repos_but_not_inside_repos() {

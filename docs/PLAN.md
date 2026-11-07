@@ -43,8 +43,16 @@ Nguyên tắc: logic viết một lần trong `gitty-core`, các giao diện ch�
 - [x] Insight: treemap, biểu đồ thành phần, Health có nút Fix, file lớn nhất trong lịch sử
 - [x] Command palette `⌘K`; sidebar có repo, branch, stash; fetch/pull/push
 
-**Mốc 2**
-- [ ] Kéo thả để rebase, giải conflict trong app desktop
-- [ ] `cargo-dist`: Homebrew, Scoop/winget cho bản TUI
-- [ ] `.dmg` có ký số và notarize, `.msi`, tự động cập nhật
-- [ ] CI build app desktop trên 3 hệ điều hành
+**Mốc 2 ✅ (phần không cần tài khoản)**
+- [x] Interactive rebase kéo thả (đổi thứ tự, pick/reword/squash/fixup/drop, xem trước, cảnh báo commit đã push)
+- [x] Giải conflict trong app desktop (theo vùng, cả file, hiện bản gốc) và thanh merge/rebase có Continue/Abort/Skip
+- [x] CI build app desktop trên macOS và Windows
+- [x] Workflow Release: bản chạy luôn, không cần cài, chỉ cho macOS Apple Silicon (`Gitty.app` zip) và Windows x64 (`Gitty.exe`), kèm bản terminal
+- [x] Đã build thử trên máy: `Gitty.app` 6.9 MB, `.dmg` 2.9 MB
+- [x] Mẫu cấu hình Homebrew và Scoop, hướng dẫn trong `docs/RELEASING.md`
+
+**Cần tài khoản hoặc quyết định của chủ dự án**
+- [x] Repo GitHub: https://github.com/lettdev/gitty
+- [ ] Ký số và notarize macOS (tài khoản Apple Developer, secret trong repo)
+- [ ] Tự động cập nhật (tạo khoá ký, bật `tauri-plugin-updater`)
+- [ ] Tạo repo tap Homebrew và bucket Scoop

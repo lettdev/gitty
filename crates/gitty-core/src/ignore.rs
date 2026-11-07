@@ -154,6 +154,23 @@ impl Repo {
         })
     }
 
+    /// Replace an ignore file's whole content (from an editor). Undoable.
+    pub fn write_ignore_file(&self, rel: &str, text: &str) -> Result<String> {
+        self.record(OpKind::Edit, format!("Edit {rel}"), |r, backups| {
+            r.backup_path(rel, backups)?;
+            let path = r.root().join(rel);
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            let mut text = text.to_string();
+            if !text.is_empty() && !text.ends_with('\n') {
+                text.push('\n');
+            }
+            fs::write(&path, text)?;
+            Ok(format!("edit {rel}"))
+        })
+    }
+
     /// Remove one line from an ignore file. `expected` guards against the file
     /// having changed since it was read.
     pub fn remove_ignore_rule(&self, rel: &str, line: usize, expected: &str) -> Result<String> {

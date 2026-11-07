@@ -35,6 +35,21 @@ fn main() {
             commands::insight,
             commands::largest_blobs,
             commands::apply_fix,
+            commands::rebase_plan,
+            commands::run_rebase,
+            commands::read_conflict,
+            commands::resolve_region,
+            commands::conflict_file_op,
+            commands::operation,
+            commands::ignore_sources,
+            commands::why_ignored,
+            commands::add_ignore,
+            commands::remove_ignore,
+            commands::read_text_file,
+            commands::write_ignore_file,
+            commands::clone_defaults,
+            commands::clone_name,
+            commands::clone_repo,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Gitty");
