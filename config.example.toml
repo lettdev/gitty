@@ -12,6 +12,10 @@ mouse = true
 # History starts with all branches; press `a` there to toggle.
 all_branches = true
 
+# Folders scanned for repositories in the Repos view (5).
+# Default: the folder that contains the current repository.
+# workspaces = ["~/Works", "~/code"]
+
 # Rebind any action. A value is one key or a list of keys.
 # Modifiers: ctrl+, alt+, shift+. Names: space enter esc tab backtab up down
 # left right pageup pagedown home end backspace delete f1..f12.

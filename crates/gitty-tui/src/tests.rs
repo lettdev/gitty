@@ -204,3 +204,192 @@ fn help_popup_lists_keys() {
     key(&mut app, KeyCode::Esc);
     assert!(app.popup.is_none());
 }
+
+// ------------------------------------------------------------------ phase 2
+
+fn unity_setup() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    let p = dir.path();
+    git(p, &["init", "-q", "-b", "main"]);
+    git(p, &["config", "user.name", "Hang"]);
+    git(p, &["config", "user.email", "hang@example.com"]);
+    git(p, &["config", "commit.gpgsign", "false"]);
+    let w = |rel: &str, text: &str| {
+        let f = p.join(rel);
+        fs::create_dir_all(f.parent().unwrap()).unwrap();
+        fs::write(f, text).unwrap();
+    };
+    w("ProjectSettings/ProjectVersion.txt", "m_EditorVersion: 6000.0.23f1\n");
+    w("Packages/manifest.json", r#"{"dependencies":{"com.unity.render-pipelines.universal":"17.0.3"}}"#);
+    w("UserSettings/Layouts/default.dwlt", "layout\n");
+    w("Assets/Scenes/Keep.unity", "%YAML 1.1\n--- !u!1 &100\nGameObject:\n  m_Name: InventoryChest\n--- !u!4 &101\nTransform:\n  m_GameObject: {fileID: 100}\n  m_LocalPosition: {x: 12.5, y: 0, z: -3.25}\n");
+    w("Assets/Scripts/Player.cs", "class Player {}\n");
+    git(p, &["add", "-A"]);
+    git(p, &["commit", "-q", "-m", "Initial Unity project"]);
+    for i in 1..=3 {
+        w(&format!("Assets/Scripts/Item{i}.cs"), &format!("class Item{i} {{}}\n"));
+        git(p, &["add", "-A"]);
+        git(p, &["commit", "-q", "-m", &format!("Add item {i}")]);
+    }
+    dir
+}
+
+#[test]
+fn insight_view_shows_project_health_and_sizes() {
+    let dir = unity_setup();
+    let mut app = app_for(dir.path());
+    key(&mut app, KeyCode::Char('4'));
+    wait(&mut app, |a| a.insight.is_some() && !a.blobs_loading);
+    let s = screen(&mut app, 140, 40);
+    println!("{s}");
+    assert!(s.contains("Unity 6000.0.23f1"));
+    assert!(s.contains("URP"));
+    assert!(s.contains("UserSettings/ is committed"));
+    assert!(s.contains("Size · repo root"));
+    assert!(s.contains("Largest in history"));
+    assert!(s.contains("Hot files"));
+
+    // fix the UserSettings warning from the Health list
+    let idx = app.health_items().iter().position(|h| h.title.starts_with("UserSettings/")).unwrap();
+    app.health_sel = idx;
+    key(&mut app, KeyCode::Enter);
+    assert!(matches!(app.popup, Some(Popup::Confirm { .. })));
+    key(&mut app, KeyCode::Char('y'));
+    settle(&mut app);
+    assert!(fs::read_to_string(dir.path().join(".gitignore")).unwrap().contains("/UserSettings/"));
+    wait(&mut app, |a| !a.insight_loading && !a.blobs_loading);
+    assert!(!app.health_items().iter().any(|h| h.title.starts_with("UserSettings/ is committed")));
+}
+
+#[test]
+fn unity_scene_change_is_summarized_in_the_diff() {
+    let dir = unity_setup();
+    let scene = dir.path().join("Assets/Scenes/Keep.unity");
+    let text = fs::read_to_string(&scene).unwrap().replace("x: 12.5", "x: 14");
+    fs::write(&scene, text).unwrap();
+    let mut app = app_for(dir.path());
+    let s = screen(&mut app, 140, 30);
+    println!("{s}");
+    assert!(s.contains("Unity changes (1)"));
+    assert!(s.contains("InventoryChest › Transform.m_LocalPosition"));
+}
+
+#[test]
+fn stash_from_keys_then_pop_from_branches() {
+    let dir = setup();
+    let mut app = app_for(dir.path());
+    key(&mut app, KeyCode::Char('s'));
+    chars(&mut app, "WIP jump");
+    key(&mut app, KeyCode::Enter);
+    settle(&mut app);
+    assert!(app.status.entries.is_empty(), "everything stashed incl. new files");
+    assert_eq!(app.stashes.len(), 1);
+    key(&mut app, KeyCode::Char('3'));
+    key(&mut app, KeyCode::Char('G')); // last row = the stash
+    assert!(app.selected_stash().is_some());
+    app.tick();
+    std::thread::sleep(Duration::from_millis(120));
+    app.tick();
+    let s = screen(&mut app, 120, 24);
+    println!("{s}");
+    assert!(s.contains("Stash · stash@{0}"));
+    assert!(s.contains("Player.cs"));
+    key(&mut app, KeyCode::Char('o'));
+    settle(&mut app);
+    assert!(app.stashes.is_empty());
+    assert_eq!(app.status.entries.len(), 2);
+}
+
+#[test]
+fn interactive_rebase_from_history() {
+    let dir = unity_setup();
+    let mut app = app_for(dir.path());
+    key(&mut app, KeyCode::Char('2'));
+    key(&mut app, KeyCode::Char('a')); // current branch only
+    settle(&mut app);
+    // select "Add item 1" (third from top) and rebase from there
+    key(&mut app, KeyCode::Char('j'));
+    key(&mut app, KeyCode::Char('j'));
+    key(&mut app, KeyCode::Char('r'));
+    assert!(matches!(app.popup, Some(Popup::Rebase(_))), "rebase editor opens");
+    let s = screen(&mut app, 120, 30);
+    println!("{s}");
+    assert!(s.contains("Interactive rebase · 3 commits"));
+    key(&mut app, KeyCode::Char('j')); // "Add item 2"
+    key(&mut app, KeyCode::Char('f')); // fixup into item 1
+    key(&mut app, KeyCode::Char('k')); // "Add item 3"
+    key(&mut app, KeyCode::Char('r'));
+    for _ in 0..10 {
+        key(&mut app, KeyCode::Backspace);
+    }
+    chars(&mut app, "Thêm 3");
+    key(&mut app, KeyCode::Enter);
+    key(&mut app, KeyCode::Enter); // review
+    assert!(matches!(app.popup, Some(Popup::Confirm { .. })));
+    key(&mut app, KeyCode::Char('y'));
+    settle(&mut app);
+    let out = Command::new("git").current_dir(dir.path()).args(["log", "--format=%s"]).output().unwrap();
+    let log = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(log.lines().collect::<Vec<_>>(), ["Thêm 3", "Add item 1", "Initial Unity project"], "{log}");
+    key(&mut app, KeyCode::Char('u'));
+    settle(&mut app);
+    let out = Command::new("git").current_dir(dir.path()).args(["log", "-1", "--format=%s"]).output().unwrap();
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "Add item 3");
+}
+
+#[test]
+fn resolve_merge_conflict_in_the_ui() {
+    let dir = setup();
+    let p = dir.path();
+    git(p, &["stash", "-u", "-q"]);
+    git(p, &["switch", "-q", "feat/inventory"]);
+    fs::write(p.join("Assets/Scripts/Player.cs"), "// theirs\n").unwrap();
+    git(p, &["commit", "-q", "-am", "theirs"]);
+    git(p, &["switch", "-q", "main"]);
+    fs::write(p.join("Assets/Scripts/Player.cs"), "// ours\n").unwrap();
+    git(p, &["commit", "-q", "-am", "ours"]);
+    let _ = Command::new("git").current_dir(p).args(["merge", "feat/inventory"]).output();
+    let mut app = app_for(p);
+    assert_eq!(app.state, gitty_core::RepoState::Merging);
+    let s = screen(&mut app, 120, 24);
+    println!("{s}");
+    assert!(s.contains("Conflicts"));
+    assert!(s.contains("Conflict 1/1"));
+    assert!(s.contains("MERGING"));
+    key(&mut app, KeyCode::Enter); // into the resolver
+    key(&mut app, KeyCode::Char('b')); // keep both
+    settle(&mut app);
+    assert_eq!(fs::read_to_string(p.join("Assets/Scripts/Player.cs")).unwrap(), "// ours\n// theirs\n");
+    key(&mut app, KeyCode::Char(' ')); // mark resolved
+    settle(&mut app);
+    key(&mut app, KeyCode::Char('m'));
+    assert!(matches!(app.popup, Some(Popup::OpMenu)));
+    key(&mut app, KeyCode::Char('c'));
+    settle(&mut app);
+    assert_eq!(app.state, gitty_core::RepoState::Clean);
+    let out = Command::new("git").current_dir(p).args(["log", "-1", "--format=%p"]).output().unwrap();
+    assert_eq!(String::from_utf8_lossy(&out.stdout).split_whitespace().count(), 2, "merge commit created");
+}
+
+#[test]
+fn repos_view_lists_sibling_repositories() {
+    let parent = tempfile::tempdir().unwrap();
+    for name in ["alpha", "beta"] {
+        let p = parent.path().join(name);
+        fs::create_dir_all(&p).unwrap();
+        git(&p, &["init", "-q", "-b", "main"]);
+    }
+    fs::write(parent.path().join("beta/x.txt"), "x").unwrap();
+    let mut app = app_for(&parent.path().join("alpha"));
+    key(&mut app, KeyCode::Char('5'));
+    wait(&mut app, |a| a.repos.len() == 2);
+    let s = screen(&mut app, 140, 20);
+    println!("{s}");
+    assert!(s.contains("alpha") && s.contains("beta"));
+    assert!(s.contains("1 changed"));
+    let beta = app.repos.iter().position(|r| r.name == "beta").unwrap();
+    app.repo_sel = beta;
+    key(&mut app, KeyCode::Enter);
+    let target = app.take_switch().expect("switch requested");
+    assert!(target.ends_with("beta"));
+}

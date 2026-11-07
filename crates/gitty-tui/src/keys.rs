@@ -132,6 +132,8 @@ pub enum Action {
     ViewChanges,
     ViewHistory,
     ViewBranches,
+    ViewInsight,
+    ViewRepos,
     NextFocus,
     PrevFocus,
     Undo,
@@ -163,6 +165,18 @@ pub enum Action {
     Checkout,
     DeleteBranch,
     RenameBranch,
+    StashPush,
+    StashPop,
+    OpMenu,
+    Rebase,
+    TakeOurs,
+    TakeTheirs,
+    TakeBoth,
+    TakeBase,
+    FileOurs,
+    FileTheirs,
+    ShowBase,
+    EditFile,
 }
 
 pub struct ActionInfo {
@@ -183,7 +197,9 @@ actions! {
     Help, "help", ["?"], "Show all keys";
     ViewChanges, "view_changes", ["1"], "Changes view";
     ViewHistory, "view_history", ["2"], "History view";
-    ViewBranches, "view_branches", ["3"], "Branches view";
+    ViewBranches, "view_branches", ["3"], "Branches & stashes view";
+    ViewInsight, "view_insight", ["4"], "Insight view";
+    ViewRepos, "view_repos", ["5"], "Repositories view";
     NextFocus, "next_focus", ["tab"], "Next pane";
     PrevFocus, "prev_focus", ["backtab"], "Previous pane";
     Undo, "undo", ["u", "ctrl+z"], "Undo the last gitty operation";
@@ -215,6 +231,18 @@ actions! {
     Checkout, "checkout", ["space", "enter"], "Switch to branch";
     DeleteBranch, "delete_branch", ["D"], "Delete branch";
     RenameBranch, "rename_branch", ["r"], "Rename branch";
+    StashPush, "stash", ["s"], "Stash all changes";
+    StashPop, "stash_pop", ["o"], "Pop the selected stash";
+    OpMenu, "operation_menu", ["m"], "Continue / abort a merge or rebase";
+    Rebase, "rebase", ["r"], "Interactive rebase from the selected commit";
+    TakeOurs, "take_ours", ["o"], "Conflict: keep our side";
+    TakeTheirs, "take_theirs", ["t"], "Conflict: keep their side";
+    TakeBoth, "take_both", ["b"], "Conflict: keep both (ours first)";
+    TakeBase, "take_base", ["e"], "Conflict: keep the original (base)";
+    FileOurs, "file_ours", ["O"], "Conflict: our version of the whole file";
+    FileTheirs, "file_theirs", ["T"], "Conflict: their version of the whole file";
+    ShowBase, "show_base", ["B"], "Conflict: show the original between the sides";
+    EditFile, "edit_file", ["E"], "Open the file in your editor";
 }
 
 pub const GLOBAL: &[Action] = &[
@@ -223,6 +251,8 @@ pub const GLOBAL: &[Action] = &[
     Action::ViewChanges,
     Action::ViewHistory,
     Action::ViewBranches,
+    Action::ViewInsight,
+    Action::ViewRepos,
     Action::NextFocus,
     Action::PrevFocus,
     Action::Undo,
@@ -231,6 +261,8 @@ pub const GLOBAL: &[Action] = &[
     Action::Pull,
     Action::Push,
     Action::GitCommand,
+    Action::StashPush,
+    Action::OpMenu,
 ];
 
 const NAV: [Action; 6] = [Action::Up, Action::Down, Action::PageUp, Action::PageDown, Action::Top, Action::Bottom];
@@ -270,6 +302,7 @@ pub const DIFF: &[Action] = &[
 ];
 
 pub const COMMITS: &[Action] = &[
+    Action::Rebase,
     Action::ToggleAllBranches,
     Action::CopyHash,
     Action::NewBranch,
@@ -288,6 +321,7 @@ pub const COMMIT_DIFF: &[Action] =
     &[Action::Back, Action::NextHunk, Action::PrevHunk, NAV[0], NAV[1], NAV[2], NAV[3], NAV[4], NAV[5]];
 
 pub const BRANCHES: &[Action] = &[
+    Action::StashPop,
     Action::Checkout,
     Action::NewBranch,
     Action::DeleteBranch,
@@ -299,6 +333,25 @@ pub const BRANCHES: &[Action] = &[
     NAV[4],
     NAV[5],
 ];
+
+pub const CONFLICT: &[Action] = &[
+    Action::TakeOurs,
+    Action::TakeTheirs,
+    Action::TakeBoth,
+    Action::TakeBase,
+    Action::FileOurs,
+    Action::FileTheirs,
+    Action::ShowBase,
+    Action::EditFile,
+    Action::Stage,
+    Action::NextHunk,
+    Action::PrevHunk,
+    Action::Back,
+];
+
+pub const HEALTH: &[Action] = &[Action::Open, Action::Stage, NAV[0], NAV[1], NAV[2], NAV[3], NAV[4], NAV[5]];
+pub const INSIGHT_LIST: &[Action] = &[Action::Open, Action::Back, NAV[0], NAV[1], NAV[2], NAV[3], NAV[4], NAV[5]];
+pub const REPOS: &[Action] = &[Action::Open, NAV[0], NAV[1], NAV[2], NAV[3], NAV[4], NAV[5]];
 
 #[derive(Deserialize, Clone, Debug)]
 #[serde(untagged)]

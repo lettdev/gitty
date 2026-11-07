@@ -318,6 +318,15 @@ impl Repo {
         self.one_diff(&args)
     }
 
+    /// Text of `rev:path` (e.g. `HEAD:a.txt`, `:a.txt` for the index), or of the
+    /// worktree file when `rev` is `None`. Empty when it doesn't exist.
+    pub fn read_version(&self, rev: Option<&str>, path: &str) -> String {
+        match rev {
+            None => std::fs::read(self.root().join(path)).map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default(),
+            Some(r) => self.git.run(&["cat-file", "blob", &format!("{r}:{path}")]).map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default(),
+        }
+    }
+
     /// Raw combined diff of a conflicted file (shown as plain text).
     pub fn diff_conflict(&self, path: &str) -> Result<String> {
         Ok(self.git.run_text(&["diff", "--no-ext-diff", "--no-color", "--", path])?)

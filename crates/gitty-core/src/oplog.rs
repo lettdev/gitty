@@ -47,6 +47,20 @@ pub enum OpKind {
     Pull,
     /// Worktree files were discarded; their content is kept as blobs.
     Discard,
+    /// Files were edited by gitty (.gitignore, .gitattributes, conflict resolution).
+    Edit,
+    /// History was rewritten on the current branch (interactive rebase).
+    Rebase,
+    /// Changes were stashed; undo pops them back.
+    StashPush,
+    /// A stash was dropped; undo stores it again.
+    StashDrop,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StashRef {
+    pub oid: String,
+    pub message: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -68,9 +82,11 @@ pub struct OpEntry {
     pub after: Snapshot,
     #[serde(default)]
     pub backups: Vec<FileBackup>,
+    #[serde(default)]
+    pub stash: Option<StashRef>,
 }
 
-fn now() -> i64 {
+pub(crate) fn now() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)
@@ -126,7 +142,7 @@ impl Repo {
         Ok(())
     }
 
-    fn oplog_push(&self, entry: OpEntry) -> Result<()> {
+    pub(crate) fn oplog_push(&self, entry: OpEntry) -> Result<()> {
         let path = self.oplog_path();
         fs::create_dir_all(path.parent().expect("oplog has a parent"))?;
         let mut f = fs::OpenOptions::new().create(true).append(true).open(&path)?;
@@ -165,6 +181,7 @@ impl Repo {
                     before,
                     after,
                     backups,
+                    stash: None,
                 });
             }
         }
@@ -172,7 +189,7 @@ impl Repo {
     }
 
     /// Content hash of a worktree file, without applying filters (LFS, eol).
-    pub(crate) fn hash_file(&self, path: &str) -> Result<Option<String>> {
+    pub fn hash_file(&self, path: &str) -> Result<Option<String>> {
         if !self.root().join(path).is_file() {
             return Ok(None);
         }
@@ -180,7 +197,7 @@ impl Repo {
     }
 
     /// Store a file's current content as a blob so it can be restored.
-    pub(crate) fn backup_path(&self, path: &str, out: &mut Vec<FileBackup>) -> Result<()> {
+    pub fn backup_path(&self, path: &str, out: &mut Vec<FileBackup>) -> Result<()> {
         let full = self.root().join(path);
         if full.is_dir() {
             for file in walk_files(&full) {
@@ -275,7 +292,7 @@ impl Repo {
         if now.head != e.after.head || now.refs != e.after.refs {
             return refuse("branches or HEAD changed after it.");
         }
-        let checks_index = !matches!(e.kind, OpKind::Checkout | OpKind::Pull);
+        let checks_index = !matches!(e.kind, OpKind::Checkout | OpKind::Pull | OpKind::Rebase);
         if checks_index && e.after.index_tree.is_some() && now.index_tree != e.after.index_tree {
             return refuse("the staging area changed after it.");
         }
@@ -294,7 +311,19 @@ impl Repo {
                 }
                 self.restore_refs(&e.before.refs)?;
             }
-            OpKind::Pull => {
+            OpKind::StashPush => {
+                let top = self.git.run_text(&["rev-parse", "-q", "--verify", "refs/stash"]).unwrap_or_default();
+                let Some(st) = &e.stash else { return refuse("the stash was not recorded.") };
+                if top.trim() != st.oid {
+                    return refuse("another stash was added or removed after it.");
+                }
+                self.git.run(&["stash", "pop", "--index", "-q"])?;
+            }
+            OpKind::StashDrop => {
+                let Some(st) = &e.stash else { return refuse("the stash was not recorded.") };
+                self.git.run(&["stash", "store", "-m", &st.message, &st.oid])?;
+            }
+            OpKind::Pull | OpKind::Rebase => {
                 match self.state() {
                     RepoState::Merging => self.git.run(&["merge", "--abort"]).map(|_| ())?,
                     RepoState::Rebasing => self.git.run(&["rebase", "--abort"]).map(|_| ())?,
@@ -305,7 +334,7 @@ impl Repo {
                 }
                 self.restore_refs(&e.before.refs)?;
             }
-            OpKind::Index | OpKind::Commit | OpKind::Refs | OpKind::Discard => {
+            OpKind::Index | OpKind::Commit | OpKind::Refs | OpKind::Discard | OpKind::Edit => {
                 self.restore_refs(&e.before.refs)?;
                 self.restore_head(&e.before.head)?;
                 if let Some(tree) = &e.before.index_tree {

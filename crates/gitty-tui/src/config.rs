@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use crate::keys::KeySpec;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(default)]
 pub struct Config {
     /// auto | unicode | nerd | ascii
@@ -16,13 +16,16 @@ pub struct Config {
     pub mouse: bool,
     /// Show all branches in History (toggle with `a`).
     pub all_branches: bool,
+    /// Folders scanned for repositories in the Repos view (default: the
+    /// folder containing the current repository).
+    pub workspaces: Vec<String>,
     /// Action name → key or list of keys, e.g. `stage = "s"`.
     pub keys: HashMap<String, KeySpec>,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self { symbols: "auto".into(), color: "auto".into(), mouse: true, all_branches: true, keys: HashMap::new() }
+        Self { symbols: "auto".into(), color: "auto".into(), mouse: true, all_branches: true, workspaces: Vec::new(), keys: HashMap::new() }
     }
 }
 
@@ -35,6 +38,14 @@ pub fn path() -> Option<PathBuf> {
         .map(PathBuf::from)
         .or_else(|| dirs::home_dir().map(|h| h.join(".config")))
         .map(|d| d.join("gitty").join("config.toml"))
+}
+
+/// Expand a leading `~` to the home folder.
+pub fn expand(path: &str) -> PathBuf {
+    match path.strip_prefix("~") {
+        Some(rest) => dirs::home_dir().map(|h| h.join(rest.trim_start_matches(['/', '\\']))).unwrap_or_else(|| PathBuf::from(path)),
+        None => PathBuf::from(path),
+    }
 }
 
 /// Load the config; a broken file falls back to defaults plus an error message.

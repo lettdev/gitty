@@ -5,10 +5,16 @@
 
 use std::sync::mpsc::{Receiver, Sender};
 
+use std::path::PathBuf;
+
 use gitty_core::branch::Branch;
+use gitty_core::insight::{Blob, Insight};
 use gitty_core::log::{Commit, LogQuery};
 use gitty_core::ops::{DiscardTarget, describe_paths};
+use gitty_core::rebase::RebaseStep;
+use gitty_core::stash::Stash;
 use gitty_core::status::Status;
+use gitty_core::workspace::{self, RepoSummary};
 use gitty_core::{Repo, RepoState};
 
 pub enum Msg {
@@ -18,6 +24,9 @@ pub enum Msg {
     Progress(String),
     OpDone(OpOutcome),
     FsChanged,
+    Insight(Result<Box<Insight>, String>),
+    Blobs(Result<Vec<Blob>, String>),
+    Repos(Vec<RepoSummary>),
 }
 
 pub struct RefreshData {
@@ -29,6 +38,7 @@ pub struct RefreshData {
     pub log: Option<Vec<Commit>>,
     pub log_limit: usize,
     pub last_op: Option<String>,
+    pub stashes: Vec<Stash>,
 }
 
 #[derive(Clone, Debug)]
@@ -50,6 +60,19 @@ pub enum OpJob {
     Pull,
     Push { set_upstream: Option<(String, String)> },
     Undo,
+    StashPush { message: String, untracked: bool },
+    StashApply { name: String, pop: bool },
+    StashDrop(Stash),
+    Rebase { base: Option<String>, steps: Vec<RebaseStep> },
+    Continue,
+    Abort,
+    Skip,
+    Resolve { path: String, text: String, what: String },
+    TakeSide { path: String, ours: bool },
+    ShowBase(String),
+    ResolveDelete(String),
+    ApplyIgnore { pattern: String, untrack: Vec<String> },
+    LfsTrack { patterns: Vec<String>, convert: Vec<String> },
 }
 
 impl OpJob {
@@ -69,6 +92,16 @@ impl OpJob {
             OpJob::Pull => "Pulling…".into(),
             OpJob::Push { .. } => "Pushing…".into(),
             OpJob::Undo => "Undoing…".into(),
+            OpJob::StashPush { .. } => "Stashing…".into(),
+            OpJob::StashApply { pop, .. } => if *pop { "Popping stash…" } else { "Applying stash…" }.into(),
+            OpJob::StashDrop(_) => "Dropping stash…".into(),
+            OpJob::Rebase { .. } => "Rebasing…".into(),
+            OpJob::Continue => "Continuing…".into(),
+            OpJob::Abort => "Aborting…".into(),
+            OpJob::Skip => "Skipping…".into(),
+            OpJob::Resolve { .. } | OpJob::TakeSide { .. } | OpJob::ShowBase(_) | OpJob::ResolveDelete(_) => "Resolving…".into(),
+            OpJob::ApplyIgnore { .. } => "Updating .gitignore…".into(),
+            OpJob::LfsTrack { .. } => "Moving files to LFS…".into(),
         }
     }
 }
@@ -148,6 +181,25 @@ fn run_job(repo: &Repo, job: OpJob, tx: &Sender<Msg>) -> OpOutcome {
             Ok(desc) => (format!("Undid: {desc}"), Ok("gitty undo".to_string())),
             Err(e) => ("Undo".into(), Err(e)),
         },
+        OpJob::StashPush { message, untracked } => ("Stashed — u to undo".into(), repo.stash_push(message, *untracked)),
+        OpJob::StashApply { name, pop } => {
+            (format!("{} {name}", if *pop { "Popped" } else { "Applied" }), repo.stash_apply(name, *pop))
+        }
+        OpJob::StashDrop(st) => (format!("Dropped {} — u to undo", st.name), repo.stash_drop(st)),
+        OpJob::Rebase { base, steps } => ("Rebased — u to undo".into(), repo.run_rebase(base.as_deref(), steps)),
+        OpJob::Continue => ("Continued".into(), repo.continue_operation()),
+        OpJob::Abort => ("Aborted".into(), repo.abort_operation()),
+        OpJob::Skip => ("Skipped commit".into(), repo.skip_operation()),
+        OpJob::Resolve { path, text, what } => (format!("{what} — u to undo"), repo.write_resolution(path, text, what)),
+        OpJob::TakeSide { path, ours } => {
+            (format!("Took {} for the whole file", if *ours { "ours" } else { "theirs" }), repo.take_side(path, *ours))
+        }
+        OpJob::ShowBase(path) => ("Showing the original version between the sides".into(), repo.show_conflict_base(path)),
+        OpJob::ResolveDelete(path) => (format!("Deleted {path}"), repo.resolve_delete(path)),
+        OpJob::ApplyIgnore { pattern, untrack } => (format!("Ignored {pattern} — u to undo"), repo.apply_ignore(pattern, untrack)),
+        OpJob::LfsTrack { patterns, convert } => {
+            (format!("Tracking {} with LFS — commit to finish", patterns.join(" ")), repo.lfs_track(patterns, convert))
+        }
     };
     match result {
         Ok(command) => OpOutcome { job, label, command, error: None, retry: None },
@@ -193,6 +245,7 @@ fn refresh(repo: &Repo, last: &str, force_log: bool, all: bool, limit: usize) ->
         log,
         log_limit: limit,
         last_op: repo.last_op().map(|e| e.description),
+        stashes: repo.stashes().unwrap_or_default(),
     })
 }
 
@@ -207,5 +260,33 @@ pub fn spawn_branch_log(repo: Repo, tx: Sender<Msg>, name: String, full_ref: Str
     std::thread::spawn(move || {
         let result = repo.log(&LogQuery { revs: vec![full_ref], skip: 0, limit: 60 }).map_err(|e| e.to_string());
         let _ = tx.send(Msg::BranchLog { name, result });
+    });
+}
+
+pub fn spawn_insight(repo: Repo, tx: Sender<Msg>, use_cache: bool) {
+    let tx2 = tx.clone();
+    let repo2 = repo.clone();
+    std::thread::spawn(move || {
+        let r = repo.insight().map(Box::new).map_err(|e| e.to_string());
+        let _ = tx.send(Msg::Insight(r));
+    });
+    // the history scan is much slower; run it alongside
+    std::thread::spawn(move || {
+        let r = repo2.largest_blobs(25, use_cache).map_err(|e| e.to_string());
+        let _ = tx2.send(Msg::Blobs(r));
+    });
+}
+
+pub fn spawn_repos(roots: Vec<PathBuf>, tx: Sender<Msg>) {
+    std::thread::spawn(move || {
+        let paths = workspace::find_repos(&roots, 2);
+        let chunks: Vec<Vec<PathBuf>> = paths.chunks(paths.len().div_ceil(8).max(1)).map(|c| c.to_vec()).collect();
+        let handles: Vec<_> = chunks
+            .into_iter()
+            .map(|chunk| std::thread::spawn(move || chunk.iter().map(|p| workspace::summarize(p)).collect::<Vec<_>>()))
+            .collect();
+        let mut all: Vec<RepoSummary> = handles.into_iter().flat_map(|h| h.join().unwrap_or_default()).collect();
+        all.sort_by(|a, b| b.last_commit.cmp(&a.last_commit).then(a.name.cmp(&b.name)));
+        let _ = tx.send(Msg::Repos(all));
     });
 }

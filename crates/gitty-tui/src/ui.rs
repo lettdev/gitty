@@ -1,5 +1,7 @@
 //! Rendering. Drawing never talks to git; it only reads `App`.
 
+mod phase2;
+
 use gitty_core::diff::LineKind;
 use gitty_core::log::{RefKind, RefLabel};
 use gitty_core::status::{EntryKind, StatusEntry};
@@ -10,7 +12,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 use unicode_width::UnicodeWidthStr;
 
-use crate::app::{App, BranchRow, DiffView, FileRow, Focus, Hit, Popup, Section, View};
+use crate::app::{App, BranchRow, DiffView, FileRow, Focus, Hit, InputPurpose, Popup, Section, View};
 use crate::keys::{self, Action};
 use crate::theme::{Symbols, Theme};
 use crate::util::{clean, relative_time};
@@ -75,6 +77,8 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             View::Changes => draw_changes(f, app, body),
             View::History => draw_history(f, app, body),
             View::Branches => draw_branches(f, app, body),
+            View::Insight => phase2::draw_insight(f, app, body),
+            View::Repos => phase2::draw_repos(f, app, body),
         }
     }
     draw_bottom(f, app, bottom);
@@ -117,9 +121,14 @@ fn draw_top(f: &mut Frame, app: &mut App, area: Rect) {
         spans.push(Span::raw("  "));
         spans.push(Span::styled(format!(" {label} "), Style::new().fg(t.warn).add_modifier(Modifier::BOLD | Modifier::REVERSED)));
     }
-    f.render_widget(Line::from(spans), area);
+    let spans_copy = spans.clone();
+    f.render_widget(Line::from(spans_copy), area);
 
-    let tabs = [(View::Changes, "1 Changes"), (View::History, "2 History"), (View::Branches, "3 Branches")];
+    let wide = [(View::Changes, "1 Changes"), (View::History, "2 History"), (View::Branches, "3 Branches"), (View::Insight, "4 Insight"), (View::Repos, "5 Repos")];
+    let narrow = [(View::Changes, "1 Chg"), (View::History, "2 Hist"), (View::Branches, "3 Br"), (View::Insight, "4 Ins"), (View::Repos, "5 Rep")];
+    let left_w: u16 = spans.iter().map(|s| s.content.width() as u16).sum();
+    let wide_w: u16 = wide.iter().map(|(_, l)| l.len() as u16 + 2).sum();
+    let tabs = if left_w + wide_w + 2 <= area.width { wide } else { narrow };
     let total: u16 = tabs.iter().map(|(_, l)| l.len() as u16 + 2).sum();
     let mut x = area.right().saturating_sub(total + 1);
     for (v, label) in tabs {
@@ -152,7 +161,7 @@ fn hints(app: &App) -> Vec<(String, String)> {
                 (k(Action::StageAll), "all".into()),
                 (k(Action::Commit), "commit".into()),
                 (k(Action::Discard), "discard".into()),
-                (k(Action::Open), "diff".into()),
+                (k(Action::Open), if app.conflict_focus_target() == Focus::Conflict { "resolve".into() } else { "diff".into() }),
             ]
         }
         Focus::Diff => {
@@ -168,19 +177,43 @@ fn hints(app: &App) -> Vec<(String, String)> {
         }
         Focus::Commits => vec![
             (k(Action::Open), "files".into()),
+            (k(Action::Rebase), "rebase from here".into()),
             (k(Action::ToggleAllBranches), if app.log_all { "current only".into() } else { "all branches".into() }),
             (k(Action::CopyHash), "copy hash".into()),
             (k(Action::NewBranch), "branch here".into()),
         ],
         Focus::CommitFiles => vec![(k(Action::Open), "diff".into()), (k(Action::Back), "back".into())],
         Focus::CommitDiff => vec![(k(Action::NextHunk), "next hunk".into()), (k(Action::Back), "back".into())],
+        Focus::Branches if app.selected_stash().is_some() => vec![
+            (k(Action::Checkout), "apply".into()),
+            (k(Action::StashPop), "pop".into()),
+            (k(Action::DeleteBranch), "drop".into()),
+        ],
         Focus::Branches => vec![
             (k(Action::Checkout), "switch".into()),
             (k(Action::NewBranch), "new".into()),
             (k(Action::RenameBranch), "rename".into()),
             (k(Action::DeleteBranch), "delete".into()),
+            (k(Action::StashPush), "stash".into()),
         ],
+        Focus::Conflict => vec![
+            (k(Action::TakeOurs), "ours".into()),
+            (k(Action::TakeTheirs), "theirs".into()),
+            (k(Action::TakeBoth), "both".into()),
+            (k(Action::ShowBase), "show original".into()),
+            (k(Action::NextHunk), "next".into()),
+            (k(Action::Stage), "mark resolved".into()),
+            (k(Action::EditFile), "editor".into()),
+        ],
+        Focus::Health => vec![(k(Action::Open), "fix".into()), (k(Action::NextFocus), "next pane".into())],
+        Focus::Sizes => vec![(k(Action::Open), "open folder".into()), (k(Action::Back), "up".into())],
+        Focus::Blobs => vec![(k(Action::Open), "go to commit".into()), (k(Action::Refresh), "rescan".into())],
+        Focus::Hot => vec![(k(Action::NextFocus), "next pane".into())],
+        Focus::Repos => vec![(k(Action::Open), "open".into()), (k(Action::Refresh), "rescan".into())],
     };
+    if app.state != gitty_core::RepoState::Clean {
+        h.insert(0, (k(Action::OpMenu), format!("{} menu", app.state.label().unwrap_or("").to_lowercase())));
+    }
     if app.last_op.is_some() {
         h.push((k(Action::Undo), "undo".into()));
     }
@@ -245,7 +278,12 @@ fn draw_changes(f: &mut Frame, app: &mut App, area: Rect) {
     } else {
         format!("Diff · {}{}", clean(&app.diff.path), if staged { " (staged)" } else { "" })
     };
+    if app.selected_entry().is_some_and(|(s, _)| s == Section::Conflicts) {
+        phase2::draw_conflict(f, app, right);
+        return;
+    }
     let focused = app.focus == Focus::Diff;
+    let right = phase2::split_summary(f, &app.theme, &app.sym, &app.diff.summary, right);
     let inner = render_diff(f, &app.theme, &app.sym, &mut app.diff, right, focused, title);
     app.hits.push((inner, Hit::List(Focus::Diff, app.diff.scroll)));
     if focused {
@@ -432,6 +470,7 @@ fn draw_history(f: &mut Frame, app: &mut App, area: Rect) {
     draw_commit_files(f, app, files);
     let title = if app.cdiff.path.is_empty() { "Diff".to_string() } else { format!("Diff · {}", clean(&app.cdiff.path)) };
     let focused = app.focus == Focus::CommitDiff;
+    let diff = phase2::split_summary(f, &app.theme, &app.sym, &app.cdiff.summary, diff);
     let inner = render_diff(f, &app.theme, &app.sym, &mut app.cdiff, diff, focused, title);
     app.hits.push((inner, Hit::List(Focus::CommitDiff, app.cdiff.scroll)));
     if focused {
@@ -452,7 +491,7 @@ fn commit_info_lines(app: &App, width: usize) -> Vec<Line<'static>> {
     lines.push(Line::from(first));
     let mut meta = vec![
         Span::styled(clean(&d.author), Style::new().add_modifier(Modifier::BOLD)),
-        Span::styled(format!(" <{}>  {}", clean(&d.email), d.date), t.dim_style()),
+        Span::styled(format!("  {}  <{}>", d.date, clean(&d.email)), t.dim_style()),
     ];
     if d.parents.len() > 1 {
         let ps: Vec<&str> = d.parents.iter().map(|p| &p[..p.len().min(7)]).collect();
@@ -573,7 +612,12 @@ fn draw_commit_files(f: &mut Frame, app: &mut App, area: Rect) {
 
 fn draw_branches(f: &mut Frame, app: &mut App, area: Rect) {
     let [left, right] = Layout::horizontal([Constraint::Percentage(45), Constraint::Min(30)]).areas(area);
-    let block = pane(&app.theme, &app.sym, format!("Branches ({})", app.branches.len()), true);
+    let title = if app.stashes.is_empty() {
+        format!("Branches ({})", app.branches.len())
+    } else {
+        format!("Branches ({}) · stashes ({})", app.branches.len(), app.stashes.len())
+    };
+    let block = pane(&app.theme, &app.sym, title, true);
     let inner = block.inner(left);
     f.render_widget(block, left);
     app.page = inner.height.saturating_sub(1) as usize;
@@ -623,7 +667,23 @@ fn draw_branches(f: &mut Frame, app: &mut App, area: Rect) {
                 f.render_widget(Line::from(spans), main);
                 f.render_widget(Line::styled(format!("{:>5} ", relative_time(b.time)), t.dim_style()), meta);
             }
+            BranchRow::Stash(si) => {
+                let st = &app.stashes[si];
+                let [main, meta] = Layout::horizontal([Constraint::Min(0), Constraint::Length(6)]).areas(rect);
+                f.render_widget(
+                    Line::from(vec![
+                        Span::styled(format!("   {} ", st.name), Style::new().fg(t.warn)),
+                        Span::raw(clean(&st.message)),
+                    ]),
+                    main,
+                );
+                f.render_widget(Line::styled(format!("{:>5} ", relative_time(st.time)), t.dim_style()), meta);
+            }
         }
+    }
+    if app.selected_stash().is_some() {
+        phase2::draw_stash_detail(f, app, right);
+        return;
     }
 
     let title = app.selected_branch().map(|b| format!("Log · {}", clean(&b.name))).unwrap_or_else(|| "Log".into());
@@ -681,13 +741,16 @@ fn footer(t: &Theme, items: &[(&str, &str)]) -> Line<'static> {
 }
 
 fn help_lines(app: &App) -> Vec<Line<'static>> {
-    let groups: [(&str, &[Action]); 7] = [
+    let groups: [(&str, &[Action]); 10] = [
         ("Everywhere", keys::GLOBAL),
         ("Files", keys::FILES),
         ("Diff", keys::DIFF),
+        ("Conflicts", keys::CONFLICT),
         ("History", keys::COMMITS),
         ("Commit files", keys::COMMIT_FILES),
-        ("Branches", keys::BRANCHES),
+        ("Branches & stashes", keys::BRANCHES),
+        ("Insight health", keys::HEALTH),
+        ("Insight lists", keys::INSIGHT_LIST),
         ("Commit message", &[]),
     ];
     let t = &app.theme;
@@ -758,17 +821,43 @@ fn draw_popup(f: &mut Frame, app: &App, area: Rect) {
             }
             f.render_widget(footer(t, &items), foot);
         }
-        Popup::Input { title, input, .. } => {
+        Popup::OpMenu => phase2::draw_opmenu(f, app, area),
+        Popup::Rebase(form) => phase2::draw_rebase(f, app, form, area),
+        Popup::ConfirmRun { title, message, .. } => {
+            let lines: Vec<Line> = message.lines().map(|l| Line::raw(clean(l))).collect();
+            let rect = centered(area, 76, lines.len() as u16 + 6);
+            f.render_widget(Clear, rect);
+            let block = popup_block(t, s, title.clone(), true);
+            let inner = block.inner(rect);
+            f.render_widget(block, rect);
+            let [body, foot] = Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).areas(inner);
+            f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), body.inner(ratatui::layout::Margin { horizontal: 1, vertical: 1 }));
+            f.render_widget(footer(t, &[(" y", "run in terminal"), ("n", "cancel")]), foot);
+        }
+        Popup::Input { title, input, purpose } => {
             let rect = centered(area, 64, 5);
             f.render_widget(Clear, rect);
-            let block = popup_block(t, s, title.clone(), false);
+            let title = match purpose {
+                InputPurpose::Stash { untracked } => {
+                    format!("Stash changes · new files {}", if *untracked { "included" } else { "left in place" })
+                }
+                _ => title.clone(),
+            };
+            let block = popup_block(t, s, title, false);
             let inner = block.inner(rect);
             f.render_widget(block, rect);
             let [field, _, foot] = Layout::vertical([Constraint::Length(1), Constraint::Length(1), Constraint::Length(1)]).areas(inner);
             let field = field.inner(ratatui::layout::Margin { horizontal: 1, vertical: 0 });
             f.render_widget(Line::raw(input.text.clone()), field);
             f.set_cursor_position(Position { x: (field.x + input.cursor_x()).min(field.right().saturating_sub(1)), y: field.y });
-            f.render_widget(footer(t, &[(" enter", "ok"), ("esc", "cancel")]), foot);
+            if matches!(purpose, InputPurpose::Stash { .. }) {
+                if input.text.is_empty() {
+                    f.render_widget(Line::styled("optional message", t.dim_style()), field);
+                }
+                f.render_widget(footer(t, &[(" enter", "stash"), ("tab", "toggle new files"), ("esc", "cancel")]), foot);
+            } else {
+                f.render_widget(footer(t, &[(" enter", "ok"), ("esc", "cancel")]), foot);
+            }
         }
         Popup::Commit(form) => {
             let branch = app.status.branch.head.clone().unwrap_or_else(|| "HEAD".into());

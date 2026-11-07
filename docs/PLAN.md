@@ -19,13 +19,19 @@ Nguyên tắc: logic viết một lần trong `gitty-core`, các giao diện ch�
 - [ ] Thử tay trên Terminal.app, iTerm2, Windows Terminal, PowerShell (conhost)
 - [ ] Đo hiệu năng trên repo khoảng 50k commit (mục tiêu mở dưới 0.5 giây)
 
-## Phase 2: Insight + thao tác nâng cao
+## Phase 2: Insight + thao tác nâng cao ✅
 
-- Nhận diện project (Unity, Godot, Unreal, Node, Rust, Go, Python, Flutter, Xcode…)
-- Dung lượng working tree và lịch sử `.git`, file lớn nhất trong history (có cache)
-- Cố vấn LFS, kiểm tra `.gitignore`, tóm tắt scene/prefab Unity
-- Stash, interactive rebase có xem trước, giải quyết conflict 3 cột
-- Workspace nhiều repo, heatmap churn
+- [x] Nhận diện project (Unity, Godot, Unreal, Node, Rust, Go, Python, Flutter, Swift, .NET, Android/JVM, CMake)
+- [x] Dung lượng working tree theo thư mục, `.git`, kho LFS
+- [x] File lớn nhất trong lịch sử, kèm commit đã thêm nó (cache theo refs)
+- [x] Cố vấn LFS (track và convert, migrate có cảnh báo), kiểm tra `.gitignore` theo loại project, kiểm tra cài đặt Unity
+- [x] Tóm tắt thay đổi scene/prefab Unity
+- [x] Stash: tạo, apply, pop, drop (undo được), xem file trong stash
+- [x] Interactive rebase có xem trước, cảnh báo commit đã push, continue/abort/skip
+- [x] Giải conflict theo vùng (ours/theirs/both/base), cả file, hiện bản gốc, mở editor
+- [x] Workspace nhiều repo
+- [x] File hay sửa (90 ngày) và người sửa nhiều nhất theo thư mục
+- [ ] Đo hiệu năng trên repo game khoảng 3 GB (mục tiêu: lần đầu dưới 10 giây, lần sau dưới 1 giây)
 
 ## Phase 3: App desktop + phát hành
 

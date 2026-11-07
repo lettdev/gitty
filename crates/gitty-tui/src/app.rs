@@ -1,13 +1,20 @@
 //! Application state and input handling.
 
+mod phase2;
+
 use std::collections::HashSet;
+use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::{Duration, Instant};
 
 use gitty_core::branch::Branch;
 use gitty_core::diff::{FileDiff, build_patch};
+use gitty_core::conflict::Pick;
 use gitty_core::graph::{Cell, GraphBuilder};
-use gitty_core::log::{Commit, CommitDetail};
+use gitty_core::insight::{Blob, Insight};
+use gitty_core::log::{Commit, CommitDetail, CommitFile};
+use gitty_core::stash::Stash;
+use gitty_core::workspace::RepoSummary;
 use gitty_core::oplog::OpKind;
 use gitty_core::ops::DiscardTarget;
 use gitty_core::status::{EntryKind, Status, StatusEntry};
@@ -22,6 +29,8 @@ use crate::util;
 use crate::widgets::{LineInput, TextArea};
 use crate::worker::{self, Msg, OpJob, OpOutcome, RefreshData};
 
+pub use phase2::{ConflictView, RebaseForm};
+
 pub const LOG_PAGE: usize = 400;
 const DETAIL_DELAY: Duration = Duration::from_millis(80);
 const FS_DEBOUNCE: Duration = Duration::from_millis(300);
@@ -32,6 +41,8 @@ pub enum View {
     Changes,
     History,
     Branches,
+    Insight,
+    Repos,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -42,6 +53,12 @@ pub enum Focus {
     CommitFiles,
     CommitDiff,
     Branches,
+    Conflict,
+    Health,
+    Sizes,
+    Blobs,
+    Hot,
+    Repos,
 }
 
 impl Focus {
@@ -53,14 +70,20 @@ impl Focus {
             Focus::CommitFiles => keys::COMMIT_FILES,
             Focus::CommitDiff => keys::COMMIT_DIFF,
             Focus::Branches => keys::BRANCHES,
+            Focus::Conflict => keys::CONFLICT,
+            Focus::Health => keys::HEALTH,
+            Focus::Sizes | Focus::Blobs | Focus::Hot => keys::INSIGHT_LIST,
+            Focus::Repos => keys::REPOS,
         }
     }
 
     fn view(self) -> View {
         match self {
-            Focus::Files | Focus::Diff => View::Changes,
+            Focus::Files | Focus::Diff | Focus::Conflict => View::Changes,
             Focus::Commits | Focus::CommitFiles | Focus::CommitDiff => View::History,
             Focus::Branches => View::Branches,
+            Focus::Health | Focus::Sizes | Focus::Blobs | Focus::Hot => View::Insight,
+            Focus::Repos => View::Repos,
         }
     }
 }
@@ -100,6 +123,7 @@ pub enum FileRow {
 pub enum BranchRow {
     Header(&'static str, usize),
     Branch(usize),
+    Stash(usize),
 }
 
 /// A scrollable diff with a line cursor and optional range selection.
@@ -117,6 +141,8 @@ pub struct DiffView {
     pub anchor: Option<usize>,
     pub scroll: usize,
     pub patchable: bool,
+    /// Structural summary for Unity scenes/prefabs.
+    pub summary: Vec<String>,
 }
 
 impl DiffView {
@@ -175,11 +201,12 @@ impl DiffView {
     }
 }
 
-#[derive(Clone)]
 pub enum InputPurpose {
     NewBranch { start: Option<String> },
     RenameBranch { old: String },
     GitCommand,
+    Stash { untracked: bool },
+    RebaseReword { form: Box<RebaseForm>, idx: usize },
 }
 
 pub struct CommitForm {
@@ -197,12 +224,18 @@ pub enum Popup {
     Input { title: String, input: LineInput, purpose: InputPurpose },
     Commit(CommitForm),
     Message { title: String, text: String, error: bool, scroll: u16, retry: Option<Vec<String>> },
+    /// Confirm, then run a git command in the terminal.
+    ConfirmRun { title: String, message: String, args: Vec<String> },
+    Rebase(RebaseForm),
+    OpMenu,
 }
 
 pub struct Suspend {
     pub args: Vec<String>,
     /// Record the command in the operation log so it can be undone.
     pub record: Option<(OpKind, String)>,
+    /// Open this file in the user's editor instead of running git.
+    pub edit: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -267,6 +300,37 @@ pub struct App {
     pub branch_log: Vec<Commit>,
     pub branch_log_for: Option<String>,
     branch_log_due: Option<Instant>,
+    pub stashes: Vec<Stash>,
+    pub stash_files: Vec<CommitFile>,
+    pub stash_files_for: Option<String>,
+
+    pub conflict: ConflictView,
+
+    // Insight
+    pub insight: Option<Insight>,
+    pub insight_error: Option<String>,
+    pub insight_loading: bool,
+    pub blobs: Option<Vec<Blob>>,
+    pub blobs_error: Option<String>,
+    pub blobs_loading: bool,
+    insight_stale: bool,
+    pub health_sel: usize,
+    pub health_off: usize,
+    pub size_path: String,
+    pub size_sel: usize,
+    pub size_off: usize,
+    pub blob_sel: usize,
+    pub blob_off: usize,
+    pub hot_sel: usize,
+    pub hot_off: usize,
+
+    // Repositories
+    pub repos: Vec<RepoSummary>,
+    pub repos_loading: bool,
+    pub repo_sel: usize,
+    pub repo_off: usize,
+    pub workspaces: Vec<PathBuf>,
+    switch_to: Option<PathBuf>,
 
     pub popup: Option<Popup>,
     pub notice: Option<Notice>,
@@ -297,6 +361,11 @@ impl App {
         let (tx, rx) = mpsc::channel();
         let (ops, op_rx) = mpsc::channel();
         worker::spawn_op_thread(repo.clone(), op_rx, tx.clone());
+        let workspaces: Vec<PathBuf> = if cfg.workspaces.is_empty() {
+            repo.root().parent().map(|p| vec![p.to_path_buf()]).unwrap_or_default()
+        } else {
+            cfg.workspaces.iter().map(|w| crate::config::expand(w)).collect()
+        };
         let mut app = Self {
             theme: Theme::new(theme::detect_depth(&cfg.color)),
             sym: Symbols::detect(&cfg.symbols),
@@ -338,6 +407,32 @@ impl App {
             branch_log: Vec::new(),
             branch_log_for: None,
             branch_log_due: None,
+            stashes: Vec::new(),
+            stash_files: Vec::new(),
+            stash_files_for: None,
+            conflict: ConflictView::default(),
+            insight: None,
+            insight_error: None,
+            insight_loading: false,
+            blobs: None,
+            blobs_error: None,
+            blobs_loading: false,
+            insight_stale: false,
+            health_sel: 0,
+            health_off: 0,
+            size_path: String::new(),
+            size_sel: 0,
+            size_off: 0,
+            blob_sel: 0,
+            blob_off: 0,
+            hot_sel: 0,
+            hot_off: 0,
+            repos: Vec::new(),
+            repos_loading: false,
+            repo_sel: 0,
+            repo_off: 0,
+            workspaces,
+            switch_to: None,
             popup: None,
             notice: None,
             last_cmd: String::new(),
@@ -501,6 +596,37 @@ impl App {
                     self.fs_dirty = Some(Instant::now());
                 }
             }
+            Msg::Insight(r) => {
+                self.insight_loading = false;
+                match r {
+                    Ok(i) => {
+                        self.insight = Some(*i);
+                        self.insight_error = None;
+                        if self.size_node().map(|n| n.path != self.size_path).unwrap_or(true) {
+                            self.size_path.clear();
+                        }
+                    }
+                    Err(e) => self.insight_error = Some(e),
+                }
+            }
+            Msg::Blobs(r) => {
+                self.blobs_loading = false;
+                match r {
+                    Ok(b) => {
+                        self.blobs = Some(b);
+                        self.blobs_error = None;
+                    }
+                    Err(e) => self.blobs_error = Some(e),
+                }
+            }
+            Msg::Repos(r) => {
+                self.repos_loading = false;
+                self.repos = r;
+                let me = self.repo.root().canonicalize().ok();
+                if let Some(i) = self.repos.iter().position(|x| x.path.canonicalize().ok() == me) {
+                    self.repo_sel = i;
+                }
+            }
         }
     }
 
@@ -513,7 +639,10 @@ impl App {
             self.last_cmd = o.command.clone();
         }
         match o.error {
-            None => self.notice(o.label),
+            None => {
+                self.notice(o.label);
+                self.after_op_insight();
+            }
             Some(err) => {
                 if let OpJob::DeleteBranch { name, force: false } = &o.job {
                     if err.contains("not fully merged") {
@@ -541,12 +670,14 @@ impl App {
     fn apply_refresh(&mut self, d: RefreshData) {
         // remember selections before the indexes they point into are replaced
         let prev_file = self.file_key();
-        let prev_branch = self.selected_branch().map(|b| b.name.clone());
+        let prev_branch = self.selected_branch().map(|b| b.name.clone()).or_else(|| self.selected_stash().map(|s| s.oid.clone()));
         self.status = d.status;
         self.branches = d.branches;
         self.remotes = d.remotes;
         self.state = d.state;
         self.last_op = d.last_op;
+        self.stashes = d.stashes;
+        self.stash_files_for = None;
         self.fingerprint = d.fingerprint;
         self.loaded_once = true;
         self.rebuild_files(prev_file);
@@ -640,6 +771,11 @@ impl App {
         let same = self.diff.path == e.path && self.diff.section == Some(sec);
         let (cursor, scroll, anchor) = (self.diff.cursor, self.diff.scroll, self.diff.anchor);
         let mut dv = DiffView { path: e.path.clone(), section: Some(sec), ..Default::default() };
+        if sec == Section::Conflicts {
+            self.load_conflict(&e);
+        } else if self.focus == Focus::Conflict {
+            self.focus = Focus::Files;
+        }
         let res = match sec {
             Section::Conflicts => self.repo.diff_conflict(&e.path).map(|t| {
                 dv.raw = Some(t.lines().map(str::to_string).collect());
@@ -660,6 +796,16 @@ impl App {
         };
         if let Err(err) = res {
             dv.note = Some(err.to_string());
+        }
+        if let Some(d) = &dv.diff {
+            dv.summary = match sec {
+                Section::Unstaged if e.kind != EntryKind::Untracked => self.unity_summary(&e.path, &e.path, Some(""), None, d),
+                Section::Staged => {
+                    let old = e.orig_path.clone().unwrap_or_else(|| e.path.clone());
+                    self.unity_summary(&e.path, &old, Some("HEAD"), Some(""), d)
+                }
+                _ => Vec::new(),
+            };
         }
         if same {
             let len = dv.len();
@@ -849,7 +995,13 @@ impl App {
             if let Some(f) = d.files.get(self.cfile_sel) {
                 dv.path = f.path.clone();
                 match self.repo.diff_commit_file(&d.hash, d.parents.first().map(String::as_str), &f.path, f.orig.as_deref()) {
-                    Ok(fd) => dv.set(fd, false),
+                    Ok(fd) => {
+                        if let Some(parent) = d.parents.first() {
+                            let old = f.orig.clone().unwrap_or_else(|| f.path.clone());
+                            dv.summary = self.unity_summary(&f.path, &old, Some(parent), Some(&d.hash), &fd);
+                        }
+                        dv.set(fd, false);
+                    }
                     Err(e) => dv.note = Some(e.to_string()),
                 }
                 dv.cursor = 0;
@@ -884,11 +1036,19 @@ impl App {
             rows.push(BranchRow::Header("Remote", remote.len()));
             rows.extend(remote.into_iter().map(BranchRow::Branch));
         }
+        if !self.stashes.is_empty() {
+            rows.push(BranchRow::Header("Stashes", self.stashes.len()));
+            rows.extend((0..self.stashes.len()).map(BranchRow::Stash));
+        }
         self.branch_rows = rows;
         let found = prev.and_then(|n| {
-            self.branch_rows.iter().position(|r| matches!(r, BranchRow::Branch(i) if self.branches[*i].name == n))
+            self.branch_rows.iter().position(|r| match r {
+                BranchRow::Branch(i) => self.branches[*i].name == n,
+                BranchRow::Stash(i) => self.stashes[*i].oid == n,
+                BranchRow::Header(..) => false,
+            })
         });
-        let first = self.branch_rows.iter().position(|r| matches!(r, BranchRow::Branch(_))).unwrap_or(0);
+        let first = self.branch_rows.iter().position(|r| !matches!(r, BranchRow::Header(..))).unwrap_or(0);
         self.branch_sel = found.unwrap_or(first);
         if self.view == View::Branches {
             self.branch_log_for = None;
@@ -899,13 +1059,13 @@ impl App {
     pub fn selected_branch(&self) -> Option<&Branch> {
         match self.branch_rows.get(self.branch_sel)? {
             BranchRow::Branch(i) => self.branches.get(*i),
-            BranchRow::Header(..) => None,
+            BranchRow::Header(..) | BranchRow::Stash(_) => None,
         }
     }
 
     fn move_branch(&mut self, delta: isize) {
         let rows: Vec<usize> =
-            (0..self.branch_rows.len()).filter(|&i| matches!(self.branch_rows[i], BranchRow::Branch(_))).collect();
+            (0..self.branch_rows.len()).filter(|&i| !matches!(self.branch_rows[i], BranchRow::Header(..))).collect();
         if rows.is_empty() {
             return;
         }
@@ -915,13 +1075,17 @@ impl App {
     }
 
     fn select_branch_row(&mut self, idx: usize) {
-        if idx < self.branch_rows.len() && matches!(self.branch_rows[idx], BranchRow::Branch(_)) && idx != self.branch_sel {
+        if idx < self.branch_rows.len() && !matches!(self.branch_rows[idx], BranchRow::Header(..)) && idx != self.branch_sel {
             self.branch_sel = idx;
             self.branch_log_due = Some(Instant::now() + DETAIL_DELAY);
         }
     }
 
     fn load_branch_log(&mut self) {
+        if self.selected_stash().is_some() {
+            self.load_stash_files();
+            return;
+        }
         if let Some(b) = self.selected_branch() {
             if self.branch_log_for.as_deref() != Some(b.name.as_str()) {
                 worker::spawn_branch_log(self.repo.clone(), self.tx.clone(), b.name.clone(), b.full.clone());
@@ -930,6 +1094,11 @@ impl App {
     }
 
     fn checkout_selected(&mut self) {
+        if let Some(st) = self.selected_stash() {
+            let name = st.name.clone();
+            self.send_job(OpJob::StashApply { name, pop: false });
+            return;
+        }
         let Some(b) = self.selected_branch().cloned() else { return };
         if b.head {
             self.notice(format!("Already on {}", b.name));
@@ -994,6 +1163,8 @@ impl App {
             View::Changes => Focus::Files,
             View::History => Focus::Commits,
             View::Branches => Focus::Branches,
+            View::Insight => Focus::Health,
+            View::Repos => Focus::Repos,
         };
         match v {
             View::History => {
@@ -1002,15 +1173,20 @@ impl App {
                 }
             }
             View::Branches => self.branch_log_due = Some(Instant::now()),
+            View::Insight => self.ensure_insight(false),
+            View::Repos => self.ensure_repos(false),
             View::Changes => {}
         }
     }
 
     fn cycle_focus(&mut self, forward: bool) {
         let order: &[Focus] = match self.view {
+            View::Changes if self.conflict_focus_target() == Focus::Conflict => &[Focus::Files, Focus::Conflict],
             View::Changes => &[Focus::Files, Focus::Diff],
             View::History => &[Focus::Commits, Focus::CommitFiles, Focus::CommitDiff],
             View::Branches => &[Focus::Branches],
+            View::Insight => &[Focus::Health, Focus::Sizes, Focus::Blobs, Focus::Hot],
+            View::Repos => &[Focus::Repos],
         };
         let i = order.iter().position(|f| *f == self.focus).unwrap_or(0);
         let n = order.len();
@@ -1026,6 +1202,24 @@ impl App {
             Focus::CommitFiles => self.select_cfile((self.cfile_sel as isize + delta).max(0) as usize),
             Focus::CommitDiff => self.cdiff.move_cursor(delta),
             Focus::Branches => self.move_branch(delta),
+            Focus::Conflict => self.conflict_region_nav(delta > 0),
+            Focus::Health => {
+                let n = self.health_items().len();
+                self.health_sel = clamp_add(self.health_sel, delta, n);
+            }
+            Focus::Sizes => {
+                let n = self.size_node().map(|n| n.children.len()).unwrap_or(0);
+                self.size_sel = clamp_add(self.size_sel, delta, n);
+            }
+            Focus::Blobs => {
+                let n = self.blobs.as_ref().map(Vec::len).unwrap_or(0);
+                self.blob_sel = clamp_add(self.blob_sel, delta, n);
+            }
+            Focus::Hot => {
+                let n = self.insight.as_ref().map(|i| i.hot.len()).unwrap_or(0);
+                self.hot_sel = clamp_add(self.hot_sel, delta, n);
+            }
+            Focus::Repos => self.repo_sel = clamp_add(self.repo_sel, delta, self.repos.len()),
         }
     }
 
@@ -1037,10 +1231,41 @@ impl App {
             Action::ViewChanges => self.set_view(View::Changes),
             Action::ViewHistory => self.set_view(View::History),
             Action::ViewBranches => self.set_view(View::Branches),
+            Action::ViewInsight => self.set_view(View::Insight),
+            Action::ViewRepos => self.set_view(View::Repos),
+            Action::StashPush => self.open_stash_input(),
+            Action::StashPop => match self.selected_stash() {
+                Some(st) => {
+                    let name = st.name.clone();
+                    self.send_job(OpJob::StashApply { name, pop: true });
+                }
+                None => self.notice("Select a stash first."),
+            },
+            Action::OpMenu => {
+                if self.state == RepoState::Clean {
+                    self.notice("No merge or rebase in progress.");
+                } else {
+                    self.popup = Some(Popup::OpMenu);
+                }
+            }
+            Action::Rebase => self.open_rebase(),
+            Action::TakeOurs => self.resolve_region(Pick::Ours),
+            Action::TakeTheirs => self.resolve_region(Pick::Theirs),
+            Action::TakeBoth => self.resolve_region(Pick::Both),
+            Action::TakeBase => self.resolve_region(Pick::Base),
+            Action::FileOurs => self.take_whole_file(true),
+            Action::FileTheirs => self.take_whole_file(false),
+            Action::ShowBase => self.show_base(),
+            Action::EditFile => self.edit_file(),
             Action::NextFocus => self.cycle_focus(true),
             Action::PrevFocus => self.cycle_focus(false),
             Action::Refresh => {
                 self.request_refresh(true);
+                match self.view {
+                    View::Insight => self.ensure_insight(true),
+                    View::Repos => self.ensure_repos(true),
+                    _ => {}
+                }
                 self.notice("Refreshed");
             }
             Action::Undo => match self.last_op.clone() {
@@ -1072,7 +1297,12 @@ impl App {
             Action::Top => self.move_by(-1_000_000),
             Action::Bottom => self.move_by(1_000_000),
             Action::Open => match self.focus {
+                Focus::Files if self.conflict_focus_target() == Focus::Conflict => self.focus = Focus::Conflict,
                 Focus::Files if self.diff.len() > 0 => self.focus = Focus::Diff,
+                Focus::Health => self.apply_health_fix(),
+                Focus::Sizes => self.size_open(),
+                Focus::Blobs => self.blob_goto_commit(),
+                Focus::Repos => self.open_selected_repo(),
                 Focus::Commits => self.focus = Focus::CommitFiles,
                 Focus::CommitFiles if self.cdiff.len() > 0 => self.focus = Focus::CommitDiff,
                 _ => {}
@@ -1082,11 +1312,15 @@ impl App {
                 Focus::Diff => self.focus = Focus::Files,
                 Focus::CommitFiles => self.focus = Focus::Commits,
                 Focus::CommitDiff => self.focus = Focus::CommitFiles,
+                Focus::Conflict => self.focus = Focus::Files,
+                Focus::Sizes => self.size_up(),
                 _ => {}
             },
             Action::Stage => match self.focus {
                 Focus::Files => self.stage_selected_file(),
                 Focus::Diff => self.stage_in_diff(),
+                Focus::Conflict => self.mark_resolved(),
+                Focus::Health => self.apply_health_fix(),
                 _ => {}
             },
             Action::StageAll => {
@@ -1116,6 +1350,7 @@ impl App {
                     self.suspend = Some(Suspend {
                         args: vec!["commit".into()],
                         record: Some((OpKind::Commit, "Commit (editor)".into())),
+                        edit: None,
                     });
                 }
             }
@@ -1129,7 +1364,11 @@ impl App {
             }
             Action::NextHunk | Action::PrevHunk => {
                 let fwd = a == Action::NextHunk;
-                if self.focus == Focus::CommitDiff { self.cdiff.jump_hunk(fwd) } else { self.diff.jump_hunk(fwd) }
+                match self.focus {
+                    Focus::CommitDiff => self.cdiff.jump_hunk(fwd),
+                    Focus::Conflict => self.conflict_region_nav(fwd),
+                    _ => self.diff.jump_hunk(fwd),
+                }
             }
             Action::ToggleAllBranches => {
                 self.log_all = !self.log_all;
@@ -1158,6 +1397,10 @@ impl App {
             }
             Action::Checkout => self.checkout_selected(),
             Action::DeleteBranch => {
+                if self.selected_stash().is_some() {
+                    self.drop_stash();
+                    return;
+                }
                 let Some(b) = self.selected_branch().cloned() else { return };
                 if b.remote {
                     self.notice_err(format!("To delete a remote branch run `:push {} --delete {}`", b.name.split('/').next().unwrap_or("origin"), b.local_name()));
@@ -1232,7 +1475,7 @@ impl App {
             },
             Popup::Message { title, text, error, mut scroll, retry } => match key.code {
                 KeyCode::Char('!') if retry.is_some() => {
-                    self.suspend = Some(Suspend { args: retry.unwrap_or_default(), record: None });
+                    self.suspend = Some(Suspend { args: retry.unwrap_or_default(), record: None, edit: None });
                     None
                 }
                 KeyCode::Char('j') | KeyCode::Down => {
@@ -1246,17 +1489,40 @@ impl App {
                 KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => None,
                 _ => Some(Popup::Message { title, text, error, scroll, retry }),
             },
-            Popup::Input { title, mut input, purpose } => match key.code {
-                KeyCode::Esc => None,
-                KeyCode::Enter => {
+            Popup::Input { title, mut input, purpose } => match (key.code, purpose) {
+                (KeyCode::Esc, InputPurpose::RebaseReword { form, .. }) => Some(Popup::Rebase(*form)),
+                (KeyCode::Esc, _) => None,
+                (KeyCode::Tab, InputPurpose::Stash { untracked }) => {
+                    Some(Popup::Input { title, input, purpose: InputPurpose::Stash { untracked: !untracked } })
+                }
+                (KeyCode::Enter, InputPurpose::RebaseReword { mut form, idx }) => {
+                    let text = input.text.trim().to_string();
+                    if !text.is_empty() {
+                        let step = &mut form.steps[idx];
+                        step.action = gitty_core::rebase::RebaseAction::Reword;
+                        step.message = Some(text);
+                    }
+                    Some(Popup::Rebase(*form))
+                }
+                (KeyCode::Enter, purpose) => {
                     self.submit_input(input.text.trim().to_string(), purpose);
                     None
                 }
-                _ => {
+                (_, purpose) => {
                     input.handle(&key);
                     Some(Popup::Input { title, input, purpose })
                 }
             },
+            Popup::ConfirmRun { title, message, args } => match key.code {
+                KeyCode::Char('y') | KeyCode::Char('Y') => {
+                    self.suspend = Some(Suspend { args, record: None, edit: None });
+                    None
+                }
+                KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc | KeyCode::Char('q') => None,
+                _ => Some(Popup::ConfirmRun { title, message, args }),
+            },
+            Popup::Rebase(form) => self.on_rebase_key(form, &key),
+            Popup::OpMenu => self.on_opmenu_key(&key),
             Popup::Commit(mut f) => {
                 let submit = (key.code == KeyCode::Enter && f.field == 0) || (ctrl && key.code == KeyCode::Char('s'));
                 if key.code == KeyCode::Esc {
@@ -1304,10 +1570,15 @@ impl App {
     }
 
     fn submit_input(&mut self, text: String, purpose: InputPurpose) {
+        if let InputPurpose::Stash { untracked } = purpose {
+            self.send_job(OpJob::StashPush { message: text, untracked });
+            return;
+        }
         if text.is_empty() {
             return;
         }
         match purpose {
+            InputPurpose::Stash { .. } | InputPurpose::RebaseReword { .. } => {}
             InputPurpose::NewBranch { start } => {
                 if text.contains(char::is_whitespace) {
                     self.notice_err("Branch names can't contain spaces.");
@@ -1326,7 +1597,7 @@ impl App {
                     args.remove(0);
                 }
                 if !args.is_empty() {
-                    self.suspend = Some(Suspend { args, record: None });
+                    self.suspend = Some(Suspend { args, record: None, edit: None });
                 }
             }
         }
@@ -1361,6 +1632,12 @@ impl App {
                         }
                     }
                     Focus::Branches => self.select_branch_row(row),
+                    Focus::Conflict => {}
+                    Focus::Health => self.health_sel = row.min(self.health_items().len().saturating_sub(1)),
+                    Focus::Sizes => self.size_sel = row.min(self.size_node().map(|n| n.children.len()).unwrap_or(1).saturating_sub(1)),
+                    Focus::Blobs => self.blob_sel = row.min(self.blobs.as_ref().map(Vec::len).unwrap_or(1).saturating_sub(1)),
+                    Focus::Hot => self.hot_sel = row.min(self.insight.as_ref().map(|i| i.hot.len()).unwrap_or(1).saturating_sub(1)),
+                    Focus::Repos => self.repo_sel = row.min(self.repos.len().saturating_sub(1)),
                 }
             }
             (MouseEventKind::ScrollDown | MouseEventKind::ScrollUp, Hit::List(f, _)) if f.view() == self.view => {
@@ -1370,4 +1647,11 @@ impl App {
             _ => {}
         }
     }
+}
+
+fn clamp_add(cur: usize, delta: isize, len: usize) -> usize {
+    if len == 0 {
+        return 0;
+    }
+    (cur as isize + delta).clamp(0, len as isize - 1) as usize
 }

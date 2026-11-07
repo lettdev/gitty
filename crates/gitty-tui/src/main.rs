@@ -97,7 +97,21 @@ fn main() -> Result<()> {
     let (cfg, cfg_error) = config::load();
     let mouse = cfg.mouse;
 
-    let mut terminal = ratatui::init();
+    use std::io::IsTerminal;
+    if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
+        eprintln!(
+            "gitty: needs an interactive terminal.\nRun it directly in Terminal, iTerm2, Windows Terminal or PowerShell — not through a pipe or a non-interactive shell."
+        );
+        std::process::exit(1);
+    }
+
+    let mut terminal = match ratatui::try_init() {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("gitty: could not open the terminal: {e}");
+            std::process::exit(1);
+        }
+    };
     enable_extras(mouse);
     let result = run(&mut terminal, repo, cfg, cfg_error);
     disable_extras(mouse);
@@ -107,9 +121,19 @@ fn main() -> Result<()> {
 
 fn run(terminal: &mut DefaultTerminal, repo: Repo, cfg: config::Config, cfg_error: Option<String>) -> Result<()> {
     let mouse = cfg.mouse;
-    let mut app = app::App::new(repo, cfg, cfg_error);
-    let _watcher = watcher::start(&app.repo, app.sender());
+    let mut app = app::App::new(repo, cfg.clone(), cfg_error);
+    let mut _watcher = watcher::start(&app.repo, app.sender());
     loop {
+        if let Some(path) = app.take_switch() {
+            match Repo::discover(&path) {
+                Ok(next) => {
+                    _watcher = None;
+                    app = app::App::new(next, cfg.clone(), None);
+                    _watcher = watcher::start(&app.repo, app.sender());
+                }
+                Err(e) => app.after_suspend(Err(format!("Can't open {}: {e}", path.display()))),
+            }
+        }
         if app.take_dirty() {
             terminal.draw(|f| ui::draw(f, &mut app))?;
         }
@@ -127,11 +151,18 @@ fn run(terminal: &mut DefaultTerminal, repo: Repo, cfg: config::Config, cfg_erro
         }
         if let Some(s) = app.take_suspend() {
             let repo = app.repo.clone();
-            let outcome = match s.record {
-                Some((kind, desc)) => repo.record(kind, desc, |r, _| {
+            let outcome = match (&s.edit, s.record) {
+                (Some(file), record) => {
+                    let desc = record.map(|r| r.1).unwrap_or_else(|| format!("Edit {file}"));
+                    repo.record(gitty_core::oplog::OpKind::Edit, desc, |r, backups| {
+                        r.backup_path(file, backups)?;
+                        run_editor(terminal, r.root(), file, mouse).map_err(|e| Error::Msg(e.to_string()))
+                    })
+                }
+                (None, Some((kind, desc))) => repo.record(kind, desc, |r, _| {
                     run_interactive(terminal, r.root(), &s.args, mouse).map_err(|e| Error::Msg(e.to_string()))
                 }),
-                None => run_interactive(terminal, repo.root(), &s.args, mouse).map_err(|e| Error::Msg(e.to_string())),
+                (None, None) => run_interactive(terminal, repo.root(), &s.args, mouse).map_err(|e| Error::Msg(e.to_string())),
             };
             app.after_suspend(outcome.map_err(|e| e.to_string()));
         }
@@ -161,5 +192,40 @@ fn run_interactive(terminal: &mut DefaultTerminal, root: &Path, args: &[String],
         Ok(s) if s.success() => Ok(shown),
         Ok(_) => Err(anyhow::anyhow!("`{shown}` failed")),
         Err(e) => Err(e.into()),
+    }
+}
+
+/// The editor git would use (core.editor, GIT_EDITOR, VISUAL, EDITOR).
+fn editor_command(root: &Path) -> String {
+    let out = std::process::Command::new("git").args(["var", "GIT_EDITOR"]).current_dir(root).output();
+    match out {
+        Ok(o) if o.status.success() => {
+            let e = String::from_utf8_lossy(&o.stdout).trim().to_string();
+            if e.is_empty() || e == ":" { default_editor() } else { e }
+        }
+        _ => default_editor(),
+    }
+}
+
+fn default_editor() -> String {
+    if cfg!(windows) { "notepad".into() } else { "vi".into() }
+}
+
+fn run_editor(terminal: &mut DefaultTerminal, root: &Path, file: &str, mouse: bool) -> Result<String> {
+    let editor = editor_command(root);
+    disable_extras(mouse);
+    ratatui::restore();
+    let status = if cfg!(windows) {
+        std::process::Command::new("cmd").args(["/C", &format!("{editor} \"{file}\"")]).current_dir(root).status()
+    } else {
+        std::process::Command::new("sh").arg("-c").arg(format!("{editor} \"$1\"")).arg("gitty").arg(file).current_dir(root).status()
+    };
+    *terminal = ratatui::init();
+    enable_extras(mouse);
+    terminal.clear()?;
+    match status {
+        Ok(s) if s.success() => Ok(format!("{editor} {file}")),
+        Ok(_) => Err(anyhow::anyhow!("{editor} exited with an error")),
+        Err(e) => Err(anyhow::anyhow!("could not start {editor}: {e}")),
     }
 }

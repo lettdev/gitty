@@ -169,6 +169,48 @@ impl Repo {
         self.record(OpKind::Refs, format!("Rename branch {old} → {new}"), |r, _| r.exec(&["branch", "-m", old, new]))
     }
 
+    /// Add a pattern to the root .gitignore and stop tracking matching paths.
+    pub fn apply_ignore(&self, pattern: &str, untrack: &[String]) -> Result<String> {
+        self.record(OpKind::Edit, format!("Ignore {pattern}"), |r, backups| {
+            r.backup_path(".gitignore", backups)?;
+            let path = r.root().join(".gitignore");
+            let mut text = fs::read_to_string(&path).unwrap_or_default();
+            if !text.lines().any(|l| l.trim() == pattern) {
+                if !text.is_empty() && !text.ends_with('\n') {
+                    text.push('\n');
+                }
+                text.push_str(pattern);
+                text.push('\n');
+                fs::write(&path, text)?;
+            }
+            let mut commands = vec![format!("echo '{pattern}' >> .gitignore")];
+            if !untrack.is_empty() {
+                let mut args = vec!["rm", "-r", "--cached", "-q", "--ignore-unmatch", "--"];
+                args.extend(untrack.iter().map(String::as_str));
+                commands.push(r.exec(&args)?);
+            }
+            Ok(commands.join(" && "))
+        })
+    }
+
+    /// `git lfs track` the patterns and convert the current versions of `convert`.
+    pub fn lfs_track(&self, patterns: &[String], convert: &[String]) -> Result<String> {
+        self.record(OpKind::Edit, format!("Track {} with LFS", patterns.join(" ")), |r, backups| {
+            r.backup_path(".gitattributes", backups)?;
+            let mut args = vec!["lfs", "track"];
+            args.extend(patterns.iter().map(String::as_str));
+            let mut commands = vec![r.exec(&args)?];
+            commands.push(r.exec(&["add", ".gitattributes"])?);
+            if !convert.is_empty() {
+                let mut add = vec!["add", "--renormalize", "--"];
+                add.extend(convert.iter().map(String::as_str));
+                r.git.run(&add)?;
+                commands.push(format!("git add --renormalize -- ({} files)", convert.len()));
+            }
+            Ok(commands.join(" && "))
+        })
+    }
+
     pub fn fetch(&self, on_line: impl FnMut(&str)) -> Result<String> {
         let args = ["fetch", "--all", "--prune", "--progress"];
         self.git.run_streaming(&args, on_line)?;
@@ -176,11 +218,7 @@ impl Repo {
     }
 
     pub fn pull(&self, on_line: impl FnMut(&str)) -> Result<String> {
-        let args = ["pull", "--progress"];
-        self.record(OpKind::Pull, "Pull", |r, _| {
-            r.git.run_streaming(&args, on_line)?;
-            Ok(display_command(&args))
-        })
+        self.pull_tracked(on_line)
     }
 
     /// Push the current branch; `set_upstream` = `(remote, branch)` when it has none yet.
