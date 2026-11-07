@@ -69,6 +69,7 @@ impl Git {
             .env("GIT_MERGE_AUTOEDIT", "no")
             .env("GIT_OPTIONAL_LOCKS", "0")
             .stdin(Stdio::null());
+        hide_console(&mut cmd);
         cmd
     }
 
@@ -188,6 +189,19 @@ fn error_text(stderr: &[u8], stdout: &[u8]) -> String {
 fn spawn_error(e: io::Error) -> Error {
     if e.kind() == io::ErrorKind::NotFound { Error::GitNotFound } else { e.into() }
 }
+
+/// On Windows, a GUI app that starts a console program (git.exe) gets a new,
+/// empty console window for every call unless told not to. Output is captured
+/// through pipes anyway, so the window is never needed.
+#[cfg(windows)]
+fn hide_console(cmd: &mut Command) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    cmd.creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(not(windows))]
+fn hide_console(_cmd: &mut Command) {}
 
 #[cfg(unix)]
 fn detach_from_tty(cmd: &mut Command) {
