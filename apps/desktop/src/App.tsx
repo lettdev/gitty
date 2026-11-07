@@ -9,6 +9,9 @@ import { Changes, type Ctx } from "./components/Changes";
 import { History } from "./components/History";
 import { Insight } from "./components/Insight";
 import { Rebase } from "./components/Rebase";
+import { Sidebar } from "./components/Sidebar";
+import { BranchSwitcher, SyncButton } from "./components/Toolbar";
+import { SearchIcon } from "./components/Icons";
 import type { RebaseStep } from "./api";
 
 type View = "changes" | "history" | "insight";
@@ -32,6 +35,8 @@ interface PaletteItem {
   cmd: string;
   run: () => void;
 }
+
+const mac = /Mac/.test(navigator.userAgent);
 
 export default function App() {
   const [repo, setRepo] = useState<RepoInfo | null | undefined>(undefined);
@@ -87,6 +92,7 @@ export default function App() {
     // dev aid: GITTY_VIEW=history,light opens a view/dialog with a theme, without saving it
     api.startView().then((spec) => {
       const parts = (spec ?? "").split(",");
+      (window as unknown as { __gittyDev?: string[] }).__gittyDev = parts;
       const v = parts.find((p) => ["changes", "history", "insight", "rebase"].includes(p)) ?? null;
       const theme = parts.find((p) => p === "light" || p === "dark");
       if (theme) document.documentElement.dataset.theme = theme;
@@ -190,9 +196,20 @@ export default function App() {
       notify(errorText(e), true);
     }
   };
-  const newBranch = async () => {
-    const name = await promptFn({ title: "New branch from HEAD", value: "", confirm: "Create and switch" });
+  const newBranch = async (initial?: string) => {
+    const name = await promptFn({ title: "New branch from HEAD", value: initial ?? "", confirm: "Create and switch" });
     if (name?.trim()) run(() => api.createBranch(name.trim(), null));
+  };
+  const newRepo = async () => {
+    const dir = await openDialog({ directory: true, multiple: false, title: "Choose an empty folder for the new repository" });
+    if (typeof dir !== "string") return;
+    try {
+      setRepo(await api.initRepo(dir));
+      setView("changes");
+      notify("Created a new repository");
+    } catch (e) {
+      notify(errorText(e), true);
+    }
   };
   const stash = async () => {
     const msg = await promptFn({ title: "Stash all changes (new files included)", value: "", body: "Optional message.", confirm: "Stash" });
@@ -211,8 +228,11 @@ export default function App() {
       { label: "Fetch all remotes", cmd: "git fetch --all --prune", run: () => run(() => api.remote("fetch")) },
       { label: "Pull", cmd: "git pull", run: () => run(() => api.remote("pull")) },
       { label: "Push", cmd: "git push", run: () => run(() => api.remote("push")) },
+      { label: "Sync (pull, then push)", cmd: "git pull && git push", run: () => run(() => api.remote("sync")) },
+      { label: "Force push (safe)", cmd: "git push --force-with-lease", run: () => run(() => api.remote("push-force")) },
+      { label: "New repository…", cmd: "git init", run: newRepo },
       { label: "Stash changes…", cmd: "git stash push -u", run: stash },
-      { label: "New branch…", cmd: "git switch -c <name>", run: newBranch },
+      { label: "New branch…", cmd: "git switch -c <name>", run: () => newBranch() },
       { label: "Open repository…", cmd: "", run: openFolder },
       { label: "Clone repository…", cmd: "git clone <url>", run: () => setCloning(true) },
       { label: "Ignore rules…", cmd: ".gitignore", run: () => setIgnore({}) },
@@ -283,42 +303,40 @@ export default function App() {
   const b = st?.status.branch;
   const changes = st?.status.entries.length ?? 0;
   return (
-    <div className="app">
+    <div className={`app ${mac ? "mac" : ""}`}>
       <div className="body">
         <Sidebar
           repo={repo}
           st={st}
           branches={branches}
+          mac={mac}
           onOpenRepo={openRepo}
           onBrowse={openFolder}
           onClone={() => setCloning(true)}
+          onNew={newRepo}
           run={run}
-          onNewBranch={newBranch}
+          onNewBranch={() => newBranch()}
           onIgnore={() => setIgnore({})}
           onSettings={() => setShowSettings(true)}
         />
         <div className="main">
-          <div className="toolbar">
-            <button className={`tab ${view === "changes" ? "on" : ""}`} onClick={() => setView("changes")}>
-              Changes {changes > 0 && <span className="count">{changes}</span>}
-            </button>
-            <button className={`tab ${view === "history" ? "on" : ""}`} onClick={() => setView("history")}>History</button>
-            <button className={`tab ${view === "insight" ? "on" : ""}`} onClick={() => setView("insight")}>Insight</button>
-            <span className="spacer" />
+          <div className="toolbar" data-tauri-drag-region>
+            <div className="tabs" role="tablist">
+              <button role="tab" aria-selected={view === "changes"} className={`tab ${view === "changes" ? "on" : ""}`} onClick={() => setView("changes")} title="⌘1">
+                Changes {changes > 0 && <span className="c">{changes}</span>}
+              </button>
+              <button role="tab" aria-selected={view === "history"} className={`tab ${view === "history" ? "on" : ""}`} onClick={() => setView("history")} title="⌘2">History</button>
+              <button role="tab" aria-selected={view === "insight"} className={`tab ${view === "insight" ? "on" : ""}`} onClick={() => setView("insight")} title="⌘3">Insight</button>
+            </div>
+            <span className="spacer" data-tauri-drag-region />
             {st?.state_label && <span className="state">{st.state_label}</span>}
-            {b && (
-              <span className="pill">
-                ⎇ {b.head ?? `detached ${b.oid?.slice(0, 7) ?? ""}`}
-                {b.upstream ? <>{b.ahead > 0 && <span className="add">↑{b.ahead}</span>}{b.behind > 0 && <span className="del">↓{b.behind}</span>}</> : b.oid && <span className="muted">not pushed</span>}
-              </span>
-            )}
-            <button className="search" onClick={() => setPalette(true)}>
-              <span style={{ flex: 1, textAlign: "left" }}>Run a command…</span>
+            <BranchSwitcher branch={b} branches={branches} run={run} onNewBranch={newBranch} />
+            <SyncButton branch={b} run={run} remotes={st?.remotes ?? []} />
+            <button className="cmdk" onClick={() => setPalette(true)}>
+              <SearchIcon className="ico" />
+              <span>Search or run…</span>
               <span className="kbd">⌘K</span>
             </button>
-            <button className="btn" onClick={() => run(() => api.remote("fetch"))}>Fetch</button>
-            <button className="btn" onClick={() => run(() => api.remote("pull"))} disabled={!b?.upstream}>Pull</button>
-            <button className="btn" onClick={() => run(() => api.remote("push"))}>Push</button>
           </div>
           <div className="content">
             {!st ? (
@@ -331,14 +349,26 @@ export default function App() {
               <Insight ctx={ctx} fingerprint={st.fingerprint} onGotoCommit={(h) => { setGotoHash(h); setView("history"); }} />
             )}
           </div>
+          <div className="sbar">
+            {busy > 0 ? (
+              <>
+                <span className="spin" />
+                <span className="last">{progress || "Working…"}</span>
+              </>
+            ) : (
+              <>
+                {last && <span className="last">› <b>{last}</b></span>}
+                {st?.last_op && (
+                  <button className="undo" onClick={() => run(api.undo)} title={`Undo: ${st.last_op}`}>
+                    Undo ⌘Z
+                  </button>
+                )}
+              </>
+            )}
+            <span className="spacer" />
+            <span>{b?.head ?? "detached"}{b?.upstream ? ` · ${b.upstream}` : ""}</span>
+          </div>
         </div>
-      </div>
-      <div className="sbar">
-        {busy > 0 ? <><span className="spin" /><span className="last">{progress || "Working…"}</span></> : <span className="last">{last && <>› <b>{last}</b></>}</span>}
-        <span>Every action shows the git command it ran</span>
-        <button className="btn small" disabled={!st?.last_op || busy > 0} onClick={() => run(api.undo)} title={st?.last_op ? `Undo: ${st.last_op}` : "Nothing to undo"}>
-          ⌘Z Undo
-        </button>
       </div>
       {rebase && (
         <Rebase
@@ -369,83 +399,6 @@ export default function App() {
       {prompt && <PromptDialog p={prompt} onDone={(v) => { prompt.resolve(v); setPrompt(null); }} />}
       {toast && <div className={`toast ${toast.err ? "err" : ""}`}>{toast.text}</div>}
     </div>
-  );
-}
-
-function Sidebar({ repo, st, branches, onOpenRepo, onBrowse, onClone, run, onNewBranch, onIgnore, onSettings }: {
-  repo: RepoInfo;
-  st: StatusDto | null;
-  branches: Branch[];
-  onOpenRepo: (p: string) => void;
-  onBrowse: () => void;
-  onClone: () => void;
-  run: (op: () => Promise<OpResult>) => Promise<boolean>;
-  onNewBranch: () => void;
-  onIgnore: () => void;
-  onSettings: () => void;
-}) {
-  const [repos, setRepos] = useState<RepoSummary[]>([]);
-  useEffect(() => {
-    api.repoList().then(setRepos).catch(() => setRepos([]));
-  }, [repo.root]);
-  const local = branches.filter((b) => !b.remote);
-  const remote = branches.filter((b) => b.remote);
-  return (
-    <aside className="side">
-      <div>
-        <h3>
-          Repositories
-          <span className="row" style={{ gap: 10 }}>
-            <button onClick={onClone}>Clone…</button>
-            <button onClick={onBrowse}>Open…</button>
-          </span>
-        </h3>
-        {repos.slice(0, 12).map((r) => (
-          <button key={r.path} className={`si ${r.path === repo.root ? "on" : ""}`} onClick={() => onOpenRepo(r.path)} title={r.path}>
-            <span className={`dot ${r.conflicts ? "conflict" : r.changes ? "dirty" : "clean"}`} />
-            <span className="grow">{r.name}</span>
-            {r.changes > 0 && <span className="sm">{r.changes}</span>}
-          </button>
-        ))}
-      </div>
-      <div>
-        <h3>Branches <button onClick={onNewBranch}>New</button></h3>
-        {local.map((b) => (
-          <button key={b.full} className={`si ${b.head ? "on" : ""}`} onDoubleClick={() => !b.head && run(() => api.switchBranch(b.name, false))} title="Double-click to switch">
-            <span className="grow">⎇ {b.name}</span>
-            {b.ahead > 0 && <span className="sm add">↑{b.ahead}</span>}
-            {b.behind > 0 && <span className="sm del">↓{b.behind}</span>}
-            {!b.ahead && !b.behind && <span className="sm">{relativeTime(b.time)}</span>}
-          </button>
-        ))}
-      </div>
-      {remote.length > 0 && (
-        <div>
-          <h3>Remote</h3>
-          {remote.slice(0, 20).map((b) => (
-            <button key={b.full} className="si" onDoubleClick={() => run(() => api.switchBranch(b.name, true))} title="Double-click to check out">
-              <span className="grow muted">{b.name}</span>
-            </button>
-          ))}
-        </div>
-      )}
-      <div>
-        <h3>This repository</h3>
-        <button className="si" onClick={onIgnore}><span className="grow">Ignore rules…</span></button>
-        <button className="si" onClick={onSettings}><span className="grow">Settings…</span><span className="sm">⌘,</span></button>
-      </div>
-      {st && st.stashes.length > 0 && (
-        <div>
-          <h3>Stashes</h3>
-          {st.stashes.map((s) => (
-            <button key={s.oid} className="si" onDoubleClick={() => run(() => api.stashApply(s.name, true))} title="Double-click to pop">
-              <span className="grow">{s.message}</span>
-              <span className="sm">{relativeTime(s.time)}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </aside>
   );
 }
 

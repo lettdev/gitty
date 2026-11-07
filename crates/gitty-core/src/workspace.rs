@@ -40,6 +40,16 @@ pub fn clone_repo(url: &str, parent: &Path, name: &str, on_line: impl FnMut(&str
     Ok(target)
 }
 
+/// Create a new repository (with an initial `main` branch) in `path`.
+pub fn init_repo(path: &Path) -> crate::Result<PathBuf> {
+    std::fs::create_dir_all(path)?;
+    if path.join(".git").exists() {
+        return Err(crate::Error::Msg(format!("{} is already a git repository.", path.display())));
+    }
+    crate::git::Git::new(path).run(&["init", "-b", "main"])?;
+    Ok(path.to_path_buf())
+}
+
 /// Repositories under `roots`, at most `max_depth` folders deep.
 /// Does not descend into a repository once found.
 pub fn find_repos(roots: &[PathBuf], max_depth: usize) -> Vec<PathBuf> {
@@ -131,6 +141,15 @@ mod tests {
         let out = clone_repo(src.to_str().unwrap(), &d.path().join("dest"), "copy", |_| lines += 1).unwrap();
         assert!(out.join("a.txt").exists());
         assert!(clone_repo(src.to_str().unwrap(), &d.path().join("dest"), "copy", |_| {}).is_err(), "won't clone over a folder");
+    }
+
+    #[test]
+    fn init_creates_a_repo_once() {
+        let d = tempfile::tempdir().unwrap();
+        let p = d.path().join("New Game");
+        init_repo(&p).unwrap();
+        assert!(p.join(".git").exists());
+        assert!(init_repo(&p).is_err());
     }
 
     #[test]

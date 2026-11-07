@@ -511,6 +511,18 @@ fn emit_progress(app: &AppHandle) -> impl FnMut(&str) + '_ {
     }
 }
 
+/// `(remote, branch)` to set as upstream when the branch has none yet.
+fn upstream_target(repo: &Repo) -> Res<Option<(String, String)>> {
+    let st = repo.status().map_err(err)?;
+    let head = st.branch.head.clone().ok_or("HEAD is detached — switch to a branch first.")?;
+    if st.branch.upstream.is_some() {
+        return Ok(None);
+    }
+    let remotes = repo.remotes().map_err(err)?;
+    let r = if remotes.iter().any(|r| r == "origin") { "origin".to_string() } else { remotes.first().cloned().ok_or("No remote configured — add one first.")? };
+    Ok(Some((r, head)))
+}
+
 #[tauri::command]
 pub async fn remote_op(app: AppHandle, state: State<'_, AppState>, op: String) -> Res<OpResult> {
     let repo = current(&state)?;
@@ -519,17 +531,25 @@ pub async fn remote_op(app: AppHandle, state: State<'_, AppState>, op: String) -
             "fetch" => ok(repo.fetch(emit_progress(&app)).map_err(err)?, "Fetched"),
             "pull" => ok(repo.pull(emit_progress(&app)).map_err(err)?, "Pulled"),
             "push" => {
-                let st = repo.status().map_err(err)?;
-                let head = st.branch.head.clone().ok_or("HEAD is detached — switch to a branch first.")?;
-                let up = if st.branch.upstream.is_some() {
-                    None
-                } else {
-                    let remotes = repo.remotes().map_err(err)?;
-                    let r = if remotes.iter().any(|r| r == "origin") { "origin".to_string() } else { remotes.first().cloned().ok_or("No remote configured.")? };
-                    Some((r, head))
-                };
+                let up = upstream_target(&repo)?;
                 let cmd = repo.push(up.as_ref().map(|(r, b)| (r.as_str(), b.as_str())), emit_progress(&app)).map_err(err)?;
                 ok(cmd, "Pushed")
+            }
+            "push-force" => ok(repo.push_force_with_lease(emit_progress(&app)).map_err(err)?, "Force-pushed (with lease)"),
+            // fetch, pull what's new, then push what's local — one button for the common case
+            "sync" => {
+                let mut cmds = vec![repo.fetch(emit_progress(&app)).map_err(err)?];
+                let st = repo.status().map_err(err)?;
+                if st.branch.upstream.is_some() && st.branch.behind > 0 {
+                    cmds.push(repo.pull(emit_progress(&app)).map_err(err)?);
+                }
+                let st = repo.status().map_err(err)?;
+                if st.branch.upstream.is_none() || st.branch.ahead > 0 {
+                    let up = upstream_target(&repo)?;
+                    cmds.push(repo.push(up.as_ref().map(|(r, b)| (r.as_str(), b.as_str())), emit_progress(&app)).map_err(err)?);
+                }
+                let n = cmds.len();
+                ok(cmds.join(" && "), if n == 1 { "Already up to date" } else { "Synced" })
             }
             other => Err(format!("unknown operation {other}")),
         }
@@ -758,5 +778,25 @@ pub async fn clone_repo(app: AppHandle, state: State<'_, AppState>, url: String,
         })
     })
     .await?;
+    open(&app, &state, &target)
+}
+
+// ------------------------------------------------------------------ misc
+
+#[tauri::command]
+pub async fn tags(state: State<'_, AppState>) -> Res<Vec<(String, String, i64)>> {
+    let repo = current(&state)?;
+    blocking(move || repo.tags().map_err(err)).await
+}
+
+#[tauri::command]
+pub async fn search_log(state: State<'_, AppState>, query: String) -> Res<Vec<Commit>> {
+    let repo = current(&state)?;
+    blocking(move || repo.search_log(&query, 300).map_err(err)).await
+}
+
+#[tauri::command]
+pub async fn init_repo(app: AppHandle, state: State<'_, AppState>, path: String) -> Res<RepoInfo> {
+    let target = blocking(move || workspace::init_repo(Path::new(&path)).map_err(err)).await?;
     open(&app, &state, &target)
 }

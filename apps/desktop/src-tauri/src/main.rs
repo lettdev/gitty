@@ -50,6 +50,9 @@ fn main() {
             commands::clone_defaults,
             commands::clone_name,
             commands::clone_repo,
+            commands::tags,
+            commands::search_log,
+            commands::init_repo,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Gitty");

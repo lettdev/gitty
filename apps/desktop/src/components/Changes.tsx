@@ -3,6 +3,7 @@ import type { DiffDto, OpResult, Section, StatusDto, StatusEntry } from "../api"
 import { api, splitPath } from "../api";
 import { Conflict, OperationBanner } from "./Conflict";
 import { DiffView } from "./DiffView";
+import { ChevronDown, ChevronRight, CommitIcon, ListIcon, TreeIcon } from "./Icons";
 
 export interface Ctx {
   run: (op: () => Promise<OpResult>) => Promise<boolean>;
@@ -133,8 +134,107 @@ export function Changes({ st, ctx, focusCommit }: { st: StatusDto; ctx: Ctx; foc
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  const group = (title: string, list: Row[], action?: { label: string; fn: () => void }) =>
-    list.length > 0 && (
+  const [asTree, setAsTreeState] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("gitty.filesTree") !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const setAsTree = (v: boolean) => {
+    setAsTreeState(v);
+    try {
+      localStorage.setItem("gitty.filesTree", v ? "1" : "0");
+    } catch {
+      /* not persisted */
+    }
+  };
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  const fileRow = (r: Row, inTree: boolean) => {
+    const [name, dir] = splitPath(r.entry.path);
+    const isSel = current === r;
+    const l = letter(r);
+    return (
+      <div
+        key={r.section + r.entry.path}
+        className={`fi ${isSel ? "sel" : ""} ${inTree && dir ? "ind" : ""}`}
+        onClick={() => setSel({ section: r.section, path: r.entry.path })}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setSel({ section: r.section, path: r.entry.path });
+          setMenu({ x: Math.min(e.clientX, window.innerWidth - 300), y: Math.min(e.clientY, window.innerHeight - 320), row: r });
+        }}
+        title={r.entry.path}
+      >
+        <button
+          className={`cb ${r.section === "staged" ? "on" : ""}`}
+          aria-label={r.section === "staged" ? `Unstage ${name}` : `Stage ${name}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggle(r);
+          }}
+        />
+        <span className={`st st-${l}`}>{l}</span>
+        <span className="fn">
+          {name}
+          {r.entry.orig_path && <span className="d"> ← {r.entry.orig_path}</span>}
+          {(!inTree || !dir) && dir && <span className="d">{dir}</span>}
+        </span>
+      </div>
+    );
+  };
+
+  const group = (title: string, list: Row[], action?: { label: string; fn: () => void }) => {
+    if (list.length === 0) return null;
+    const section = list[0].section;
+    let body: React.ReactNode;
+    if (!asTree || section === "conflicts") {
+      body = list.map((r) => fileRow(r, false));
+    } else {
+      // compact folders: one row per directory, files under it
+      const byDir = new Map<string, Row[]>();
+      for (const r of list) {
+        const dir = splitPath(r.entry.path)[1];
+        byDir.set(dir, [...(byDir.get(dir) ?? []), r]);
+      }
+      const dirs = [...byDir.keys()].sort((a, b) => (a === "" ? -1 : b === "" ? 1 : a.localeCompare(b)));
+      body = dirs.map((dir) => {
+        const rs = byDir.get(dir)!;
+        if (!dir) return rs.map((r) => fileRow(r, true));
+        const key = section + ":" + dir;
+        const open = !collapsed.has(key);
+        const paths = rs.flatMap((r) => (r.entry.orig_path && section === "staged" ? [r.entry.orig_path, r.entry.path] : [r.entry.path]));
+        return (
+          <div key={key}>
+            <div
+              className="fi dir"
+              onClick={() => {
+                const next = new Set(collapsed);
+                if (open) next.add(key);
+                else next.delete(key);
+                setCollapsed(next);
+              }}
+            >
+              <button
+                className={`cb ${section === "staged" ? "on" : ""}`}
+                aria-label={section === "staged" ? `Unstage ${dir}` : `Stage ${dir}`}
+                title={section === "staged" ? "Unstage this folder" : "Stage this folder"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  ctx.run(() => (section === "staged" ? api.unstage(paths) : api.stage(paths)));
+                }}
+              />
+              <span className="tw">{open ? <ChevronDown size={9} /> : <ChevronRight size={9} />}</span>
+              <span className="fn">{dir}</span>
+              <span className="d">{rs.length}</span>
+            </div>
+            {open && rs.map((r) => fileRow(r, true))}
+          </div>
+        );
+      });
+    }
+    return (
       <>
         <div className="gh">
           <span>
@@ -142,43 +242,10 @@ export function Changes({ st, ctx, focusCommit }: { st: StatusDto; ctx: Ctx; foc
           </span>
           {action && <button onClick={action.fn}>{action.label}</button>}
         </div>
-        {list.map((r) => {
-          const [name, dir] = splitPath(r.entry.path);
-          const isSel = current === r;
-          const l = letter(r);
-          return (
-            <div
-              key={r.section + r.entry.path}
-              className={`fi ${isSel ? "sel" : ""}`}
-              onClick={() => setSel({ section: r.section, path: r.entry.path })}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                setSel({ section: r.section, path: r.entry.path });
-                setMenu({ x: Math.min(e.clientX, window.innerWidth - 300), y: Math.min(e.clientY, window.innerHeight - 320), row: r });
-              }}
-              title="Right-click for more"
-            >
-              <button
-                className={`cb ${r.section === "staged" ? "on" : ""}`}
-                aria-label={r.section === "staged" ? `Unstage ${name}` : `Stage ${name}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggle(r);
-                }}
-              />
-              <span className={`st st-${l}`}>{l}</span>
-              <span className="fn">
-                <b>
-                  {name}
-                  {r.entry.orig_path && <span className="muted"> ← {r.entry.orig_path}</span>}
-                </b>
-                <span>{dir}</span>
-              </span>
-            </div>
-          );
-        })}
+        {body}
       </>
     );
+  };
 
   const verb = current?.section === "staged" ? "Unstage" : "Stage";
   return (
@@ -186,6 +253,13 @@ export function Changes({ st, ctx, focusCommit }: { st: StatusDto; ctx: Ctx; foc
     {st.state_label && <OperationBanner label={st.state_label} conflicts={rows.conflicts.length} ctx={ctx} />}
     <div className="split" style={{ gridTemplateColumns: "320px 1fr", flex: 1 }}>
       <div className="panel">
+        <div className="files-h">
+          <span className="t">{all.length === 0 ? "No changes" : `${all.length} change${all.length === 1 ? "" : "s"}`}</span>
+          <div className="mini-seg" role="group" aria-label="File list layout">
+            <button className={asTree ? "on" : ""} onClick={() => setAsTree(true)} title="Group by folder"><TreeIcon /></button>
+            <button className={!asTree ? "on" : ""} onClick={() => setAsTree(false)} title="Flat list"><ListIcon /></button>
+          </div>
+        </div>
         <div className="scroll">
           {all.length === 0 && (
             <div className="empty">
@@ -232,6 +306,7 @@ export function Changes({ st, ctx, focusCommit }: { st: StatusDto; ctx: Ctx; foc
       <DiffView
         title={current ? splitPath(current.entry.path)[0] : "Diff"}
         sub={current ? splitPath(current.entry.path)[1] : undefined}
+        path={current?.entry.path}
         dto={dto}
         loading={loading}
         actions={
@@ -261,11 +336,15 @@ function CommitBox({ st, ctx, focus }: { st: StatusDto; ctx: Ctx; focus: number 
   const [summary, setSummary] = useState("");
   const [body, setBody] = useState("");
   const [amend, setAmend] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const staged = st.status.entries.filter((e) => e.kind !== "Untracked" && e.kind !== "Unmerged" && e.index !== ".").length;
   const branch = st.status.branch.head ?? "HEAD";
   useEffect(() => {
-    if (focus > 0) document.getElementById("commit-summary")?.focus();
+    if (focus > 0) setExpanded(true);
   }, [focus]);
+  useEffect(() => {
+    if (expanded) document.getElementById("commit-summary")?.focus();
+  }, [expanded, focus]);
   useEffect(() => {
     if (!amend) return;
     api.lastMessage().then((m) => {
@@ -282,29 +361,61 @@ function CommitBox({ st, ctx, focus }: { st: StatusDto; ctx: Ctx; focus: number 
       setSummary("");
       setBody("");
       setAmend(false);
+      setExpanded(false);
     }
   };
-  const onKey = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      submit();
-    }
+  const collapseIfEmpty = () => {
+    if (!summary.trim() && !body.trim() && !amend) setExpanded(false);
   };
+  if (!expanded) {
+    return (
+      <div className="commitbox">
+        <button className="commit-collapsed" onClick={() => setExpanded(true)}>
+          <CommitIcon className="ico" />
+          <span>{staged > 0 ? `Write a message to commit ${staged} file${staged === 1 ? "" : "s"}…` : "Stage files, then write a commit message…"}</span>
+          <span className="kbd">⌘↵</span>
+        </button>
+      </div>
+    );
+  }
   return (
-    <div className="commitbox">
-      <input
-        id="commit-summary"
-        placeholder="Summary"
-        value={summary}
-        onChange={(e) => setSummary(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            submit();
-          }
-        }}
-      />
-      <textarea placeholder="Description (optional)" value={body} onChange={(e) => setBody(e.target.value)} onKeyDown={onKey} />
+    <div
+      className="commitbox"
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) collapseIfEmpty();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          (document.activeElement as HTMLElement)?.blur();
+          collapseIfEmpty();
+        }
+      }}
+    >
+      <div className="commit-card">
+        <input
+          id="commit-summary"
+          placeholder="Summary"
+          value={summary}
+          onChange={(e) => setSummary(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+        />
+        <textarea
+          placeholder="Description (optional)"
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+        />
+      </div>
       <div className="row">
         <label className="check">
           <input type="checkbox" checked={amend} onChange={(e) => setAmend(e.target.checked)} /> Amend
@@ -316,6 +427,7 @@ function CommitBox({ st, ctx, focus }: { st: StatusDto; ctx: Ctx; focus: number 
       </div>
       <button className="btn primary" disabled={!canCommit} onClick={submit}>
         {amend ? "Amend last commit" : `Commit ${staged} file${staged === 1 ? "" : "s"} to ${branch}`}
+        <span className="kbd on-primary">⌘↵</span>
       </button>
     </div>
   );

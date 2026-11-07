@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gitty Desktop v2</title>
+<style>
+/* Layout: a single macOS window with the title bar merged into the UI — sidebar | toolbar + content. */
+:root {
+  --bg: #ffffff; --side: rgba(238, 242, 240, .92); --panel: #f8faf9; --line: #e2e7e4; --line-soft: #eef1ef;
+  --fg: #18201c; --fg2: #3d4742; --muted: #6b7570; --hover: rgba(24, 32, 28, .055); --sel: rgba(31, 122, 90, .12);
+  --accent: #1f7a5a; --accent-fg: #fff;
+  --add: #1a7f37; --del: #cf222e; --mod: #9a6700; --info: #0969da; --violet: #8250df; --orange: #c4561d;
+  --add-bg: rgba(26, 127, 55, .09); --del-bg: rgba(207, 34, 46, .08); --add-word: rgba(26, 127, 55, .26); --del-word: rgba(207, 34, 46, .22);
+  --kw: #8250df; --ty: #0f6e8a; --str: #0a6b3d; --num: #b35900; --com: #7d8782; --fn: #6639ba;
+  --shadow: 0 16px 48px -18px rgba(10, 20, 15, .35), 0 0 0 1px rgba(10, 20, 15, .06);
+  --ui: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #16191b; --side: rgba(20, 23, 25, .9); --panel: #1a1e20; --line: #2a3133; --line-soft: #222829;
+  --fg: #e6ebe8; --fg2: #c2cac6; --muted: #98a29d; --hover: rgba(230, 235, 232, .06); --sel: rgba(76, 199, 155, .14);
+  --accent: #4cc79b; --accent-fg: #0c1511;
+  --add: #3fb950; --del: #f85149; --mod: #d29922; --info: #58a6ff; --violet: #a78bfa; --orange: #f0883e;
+  --add-bg: rgba(63, 185, 80, .10); --del-bg: rgba(248, 81, 73, .10); --add-word: rgba(63, 185, 80, .30); --del-word: rgba(248, 81, 73, .30);
+  --kw: #c4a7ff; --ty: #6cc6e0; --str: #8fd6a4; --num: #f2b36b; --com: #79847f; --fn: #d2a8ff;
+  --shadow: 0 16px 48px -16px rgba(0, 0, 0, .7), 0 0 0 1px rgba(255, 255, 255, .06);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; }
+body { background: #6f8f84; font: 13px/1.45 var(--ui); color: var(--fg); -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; align-items: center; padding: 24px 16px; gap: 14px; overflow: auto; }
+body.dark-desk { background: #26322e; }
+button { font: inherit; color: inherit; }
+.mono { font-family: var(--mono); }
+.muted { color: var(--muted); }
+
+/* page chrome around the mockup */
+.chrome { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; color: #fff; font-size: 13px; }
+.chrome b { font-weight: 600; }
+.chrome .seg { display: inline-flex; background: rgba(0,0,0,.25); border-radius: 8px; padding: 2px; }
+.chrome .seg button { border: 0; background: none; color: #e9f1ed; padding: 4px 12px; border-radius: 6px; cursor: pointer; }
+.chrome .seg button.on { background: #fff; color: #1b2a24; }
+.notes { max-width: 1280px; width: 100%; color: #eef5f1; font-size: 12.5px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 18px; }
+.notes span b { color: #fff; }
+
+/* window */
+.win { width: 1280px; height: 800px; max-width: 100%; border-radius: 12px; overflow: hidden; background: var(--bg); box-shadow: 0 30px 80px -20px rgba(0,0,0,.45), 0 0 0 .5px rgba(0,0,0,.4); display: grid; grid-template-columns: 248px 1fr; position: relative; }
+.side { background: var(--side); backdrop-filter: blur(20px); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.traffic { height: 46px; display: flex; align-items: center; gap: 8px; padding: 0 16px; flex: none; }
+.traffic i { width: 12px; height: 12px; border-radius: 50%; display: block; background: #ff5f57; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.2); }
+.traffic i:nth-child(2) { background: #febc2e; } .traffic i:nth-child(3) { background: #28c840; }
+
+.repo-btn { margin: 0 10px 8px; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); cursor: pointer; text-align: left; }
+.repo-btn:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.repo-ic { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, #2f7d57, #1f5c45); display: grid; place-items: center; flex: none; color: #fff; font-weight: 700; font-size: 12px; }
+.repo-btn .t { flex: 1; min-width: 0; line-height: 1.25; }
+.repo-btn .t b { display: block; font-weight: 600; }
+.repo-btn .t span { font-size: 11.5px; color: var(--muted); }
+.chev { color: var(--muted); flex: none; }
+
+.side-scroll { overflow: auto; flex: 1; padding: 4px 8px 12px; }
+.sec { margin-top: 6px; }
+.sec-h { display: flex; align-items: center; gap: 6px; width: 100%; border: 0; background: none; padding: 5px 8px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.sec-h:hover { background: var(--hover); }
+.sec-h .tw { transition: transform .15s; display: inline-block; width: 10px; }
+.sec.closed .sec-h .tw { transform: rotate(-90deg); }
+.sec.closed .sec-b { display: none; }
+.sec-h .n { margin-left: auto; font: 11px var(--mono); text-transform: none; letter-spacing: 0; }
+.filter { margin: 4px 4px 6px; display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 7px; background: var(--hover); color: var(--muted); font-size: 12px; }
+.it { display: flex; align-items: center; gap: 7px; padding: 4px 8px; border-radius: 6px; white-space: nowrap; cursor: default; color: var(--fg2); }
+.it:hover { background: var(--hover); }
+.it.on { background: var(--sel); color: var(--fg); font-weight: 600; }
+.it .g { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.it .m { font: 11px var(--mono); color: var(--muted); }
+.it.folder { color: var(--muted); }
+.it.sub { padding-left: 24px; }
+.ico { width: 14px; height: 14px; flex: none; color: var(--muted); }
+.it.on .ico { color: var(--accent); }
+.ab { font: 11px var(--mono); } .ab .up { color: var(--add); } .ab .dn { color: var(--del); }
+.side-foot { border-top: 1px solid var(--line); padding: 8px; display: flex; gap: 4px; }
+.side-foot button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; border: 0; background: none; padding: 6px; border-radius: 6px; color: var(--muted); cursor: pointer; font-size: 12px; }
+.side-foot button:hover { background: var(--hover); color: var(--fg); }
+
+/* main */
+.main { display: grid; grid-template-rows: 46px 1fr 26px; min-width: 0; min-height: 0; }
+.toolbar { display: flex; align-items: center; gap: 8px; padding: 0 12px 0 8px; border-bottom: 1px solid var(--line); }
+.tabs { display: flex; gap: 2px; background: var(--hover); padding: 2px; border-radius: 8px; }
+.tab { border: 0; background: none; padding: 4px 12px; border-radius: 6px; cursor: pointer; color: var(--muted); font-weight: 500; display: flex; gap: 6px; align-items: center; }
+.tab.on { background: var(--bg); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.tab .c { font: 11px var(--mono); color: var(--muted); }
+.sp { flex: 1; }
+.tb { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); cursor: pointer; white-space: nowrap; font-weight: 500; }
+.tb:hover { background: var(--panel); }
+.tb.ghost { border-color: transparent; background: none; color: var(--muted); }
+.tb.ghost:hover { background: var(--hover); color: var(--fg); }
+.branch-btn { font-family: var(--mono); font-size: 12.5px; }
+.split-btn { display: inline-flex; }
+.split-btn .tb:first-child { border-radius: 7px 0 0 7px; }
+.split-btn .tb:last-child { border-radius: 0 7px 7px 0; border-left: 0; padding: 0 7px; }
+.cmdk { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px; width: 200px; border-radius: 7px; background: var(--hover); color: var(--muted); cursor: pointer; border: 0; }
+.cmdk .k { margin-left: auto; font: 11px var(--mono); }
+
+.content { min-height: 0; overflow: hidden; position: relative; }
+.view { height: 100%; display: none; }
+.view.on { display: grid; }
+
+/* changes */
+.changes { grid-template-columns: 300px 1fr; }
+.files { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.files-h { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line-soft); }
+.files-h .t { font-weight: 600; flex: 1; }
+.mini-seg { display: inline-flex; background: var(--hover); border-radius: 6px; padding: 2px; }
+.mini-seg button { border: 0; background: none; padding: 2px 7px; border-radius: 4px; cursor: pointer; color: var(--muted); display: grid; place-items: center; }
+.mini-seg button.on { background: var(--bg); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+.flist { flex: 1; overflow: auto; padding: 4px 0; }
+.grp { display: flex; align-items: center; gap: 6px; padding: 8px 12px 4px; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.grp a { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--accent); cursor: pointer; font-size: 12px; }
+.f { display: grid; grid-template-columns: 16px 16px 1fr auto; gap: 8px; align-items: center; padding: 4px 12px; cursor: default; }
+.f:hover { background: var(--hover); }
+.f.sel { background: var(--sel); }
+.f.dir { color: var(--muted); grid-template-columns: 16px 14px 1fr auto; }
+.f.ind1 { padding-left: 26px; } .f.ind2 { padding-left: 40px; }
+.cbx { width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid color-mix(in srgb, var(--muted) 80%, transparent); display: grid; place-items: center; }
+.cbx.on { background: var(--accent); border-color: var(--accent); }
+.cbx.on::after { content: ""; width: 7px; height: 4px; border-left: 2px solid var(--accent-fg); border-bottom: 2px solid var(--accent-fg); transform: rotate(-45deg) translate(1px, -1px); }
+.cbx.part { border-color: var(--accent); }
+.cbx.part::after { content: ""; width: 7px; height: 2px; background: var(--accent); border-radius: 1px; }
+.st { font: 700 11px var(--mono); text-align: center; }
+.st.M { color: var(--mod); } .st.A, .st.U { color: var(--add); } .st.D { color: var(--del); }
+.fn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fn .d { color: var(--muted); font-size: 11.5px; margin-left: 6px; }
+.num { font: 11px var(--mono); white-space: nowrap; } .num .a { color: var(--add); } .num .r { color: var(--del); }
+
+.commit { border-top: 1px solid var(--line); padding: 10px; display: flex; flex-direction: column; gap: 8px; background: var(--panel); }
+.commit .in { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 8px 10px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.commit .in.focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); color: var(--fg); flex-direction: column; align-items: stretch; gap: 6px; }
+.commit .in.focus .body { color: var(--muted); font-size: 12.5px; min-height: 36px; border-top: 1px solid var(--line-soft); padding-top: 6px; }
+.commit .row { display: flex; align-items: center; gap: 8px; }
+.btn-primary { flex: 1; height: 30px; border-radius: 7px; border: 0; background: var(--accent); color: var(--accent-fg); font-weight: 600; cursor: pointer; }
+.chk { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+
+.diff { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.diff-h { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--line-soft); }
+.diff-h .path { font: 12.5px var(--mono); }
+.diff-h .path span { color: var(--muted); }
+.diff-h .stat { font: 11.5px var(--mono); }
+.dscroll { flex: 1; overflow: auto; font: 12.5px/1.65 var(--mono); }
+.hunk { display: flex; align-items: center; gap: 10px; white-space: nowrap; overflow: hidden; padding: 4px 14px 4px 54px; background: color-mix(in srgb, var(--info) 6%, var(--bg)); color: var(--muted); border-block: 1px solid var(--line-soft); font-size: 12px; position: sticky; top: 0; z-index: 1; }
+.hunk .fnc { color: var(--fg2); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.hunk .acts { margin-left: auto; display: flex; gap: 6px; font-family: var(--ui); }
+.hb { white-space: nowrap; border: 1px solid var(--line); background: var(--bg); border-radius: 5px; padding: 1px 8px; cursor: pointer; font-size: 12px; }
+.hb.danger { color: var(--del); }
+.ln { display: grid; grid-template-columns: 30px 40px 40px 16px 1fr; white-space: pre; }
+.ln .gut { display: grid; place-items: center; }
+.ln .gut .cbx { width: 13px; height: 13px; opacity: 0; transition: opacity .1s; }
+.ln:hover .gut .cbx, .ln.pick .gut .cbx { opacity: 1; }
+.ln .no { color: var(--muted); opacity: .65; text-align: right; padding-right: 8px; user-select: none; }
+.ln.add { background: var(--add-bg); } .ln.del { background: var(--del-bg); }
+.ln.add .sg { color: var(--add); } .ln.del .sg { color: var(--del); }
+.ln.pick { box-shadow: inset 3px 0 0 var(--mod); }
+.ln .w-add { background: var(--add-word); border-radius: 3px; }
+.ln .w-del { background: var(--del-word); border-radius: 3px; }
+.kw { color: var(--kw); } .ty { color: var(--ty); } .str { color: var(--str); } .nu { color: var(--num); } .com { color: var(--com); font-style: italic; } .fu { color: var(--fn); }
+.selbar { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-top: 1px solid var(--line); background: var(--panel); font-family: var(--ui); }
+
+/* split diff */
+.split { display: none; }
+.dscroll.is-split .uni { display: none; }
+.dscroll.is-split .split { display: grid; grid-template-columns: 1fr 1fr; }
+.sl { display: grid; grid-template-columns: 40px 1fr; white-space: pre; min-width: 0; overflow: hidden; }
+.sl + .sl { border-left: 1px solid var(--line-soft); }
+.sl .no { color: var(--muted); opacity: .65; text-align: right; padding-right: 8px; }
+.sl.add { background: var(--add-bg); } .sl.del { background: var(--del-bg); } .sl.empty { background: repeating-linear-gradient(135deg, transparent 0 5px, var(--line-soft) 5px 6px); }
+
+/* history */
+.history { grid-template-columns: 1.25fr 1fr; }
+.hl { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.hl-h { display: flex; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line-soft); align-items: center; }
+.search { flex: 1; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 7px; background: var(--hover); color: var(--muted); }
+.hrows { overflow: auto; flex: 1; }
+.day { position: sticky; top: 0; z-index: 1; padding: 6px 14px 4px 60px; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(6px); }
+.hr { display: grid; grid-template-columns: 52px 22px 1fr auto; align-items: center; gap: 10px; height: 36px; padding-right: 14px; }
+.hr:hover { background: var(--hover); }
+.hr.sel { background: var(--sel); }
+.hr svg { display: block; }
+.av { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; font-weight: 700; color: #fff; }
+.hr .msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; gap: 6px; align-items: center; }
+.hr .meta { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.ref { font: 11px var(--mono); padding: 0 6px; border-radius: 4px; white-space: nowrap; }
+.ref.head { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 700; }
+.ref.br { background: color-mix(in srgb, var(--violet) 14%, transparent); color: var(--violet); }
+.ref.rm { background: var(--hover); color: var(--muted); }
+.ref.tag { background: color-mix(in srgb, var(--orange) 14%, transparent); color: var(--orange); }
+.det { display: flex; flex-direction: column; min-height: 0; }
+.det-h { padding: 14px 16px; border-bottom: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 8px; }
+.det-h h2 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -.005em; }
+.det-h .who { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.det-h .who b { color: var(--fg); font-weight: 500; }
+.det-h p { margin: 0; color: var(--fg2); font-size: 12.5px; white-space: pre-wrap; }
+.det-acts { display: flex; gap: 6px; }
+.det-files { padding: 6px 0; overflow: auto; }
+
+/* overlays */
+.pop { position: absolute; z-index: 20; background: var(--bg); border-radius: 11px; box-shadow: var(--shadow); display: none; }
+.pop.open { display: block; }
+.repo-pop { left: 10px; top: 96px; width: 330px; }
+.pop .srch { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); color: var(--muted); }
+.pop .lab { padding: 8px 12px 4px; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.rr { display: grid; grid-template-columns: 8px 1fr auto auto; gap: 10px; align-items: center; padding: 6px 12px; margin: 0 4px; border-radius: 7px; }
+.rr:hover, .rr.on { background: var(--hover); }
+.rr .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--add); }
+.rr .dot.dirty { background: var(--mod); }
+.rr .b { font: 11.5px var(--mono); color: var(--muted); }
+.pop .foot { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--line-soft); margin-top: 6px; }
+.pop .foot .tb { flex: 1; justify-content: center; }
+.branch-pop { right: 268px; top: 42px; width: 300px; }
+.sync-pop { right: 236px; top: 42px; width: 260px; padding: 6px; }
+.mi { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; padding: 7px 10px; border-radius: 7px; cursor: pointer; text-align: left; }
+.mi:hover { background: var(--hover); }
+.mi code { margin-left: auto; font: 11px var(--mono); color: var(--muted); }
+
+.sbar { display: flex; align-items: center; gap: 10px; padding: 0 12px; border-top: 1px solid var(--line); font: 11.5px var(--mono); color: var(--muted); background: var(--panel); }
+.sbar .cmd { color: var(--fg2); }
+.sbar .undo { border: 0; background: none; color: var(--accent); cursor: pointer; font: inherit; }
+</style>
+</head>
+<body>
+
+<div class="chrome">
+  <b>Gitty desktop · bản phác v2</b>
+  <div class="seg" role="group" aria-label="Theme">
+    <button data-theme-btn="light" class="on">Sáng</button>
+    <button data-theme-btn="dark">Tối</button>
+  </div>
+  <div class="seg" role="group" aria-label="Màn hình">
+    <button data-view-btn="changes" class="on">Changes</button>
+    <button data-view-btn="history">History</button>
+  </div>
+  <span style="opacity:.8">Thử bấm: nút repo, tên branch, nút Sync, các mục sidebar, nút cây/danh sách, Unified/Split, ô commit.</span>
+</div>
+
+<div class="win" id="win">
+  <!-- ===================== SIDEBAR ===================== -->
+  <aside class="side">
+    <div class="traffic"><i></i><i></i><i></i></div>
+    <button class="repo-btn" id="repoBtn" aria-haspopup="true">
+      <span class="repo-ic">LK</span>
+      <span class="t"><b>lantern-keep</b><span>~/Works · Unity 6</span></span>
+      <svg class="chev" width="12" height="12" viewBox="0 0 12 12"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+
+    <div class="side-scroll">
+      <div class="sec">
+        <button class="sec-h"><span class="tw">▾</span>Branches<span class="n">7</span></button>
+        <div class="sec-b">
+          <div class="filter"><svg class="ico" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Lọc branch…</div>
+          <div class="it"><svg class="ico" viewBox="0 0 16 16"><circle cx="5" cy="4" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="5" cy="12" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="11" cy="6" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 5.6v4.8M11 7.6c0 2.4-6 1.6-6 2.8" fill="none" stroke="currentColor" stroke-width="1.4"/></svg><span class="g">main</span><span class="m">1d</span></div>
+          <div class="it folder"><svg class="ico" viewBox="0 0 16 16"><path d="M2 4.5h4l1.5 1.5H14v6.5H2z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg><span class="g">feat</span><span class="m">3</span></div>
+          <div class="it sub on"><svg class="ico" viewBox="0 0 16 16"><circle cx="5" cy="4" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="5" cy="12" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="11" cy="6" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 5.6v4.8M11 7.6c0 2.4-6 1.6-6 2.8" fill="none" stroke="currentColor" stroke-width="1.4"/></svg><span class="g">inventory</span><span class="ab"><span class="up">↑2</span></span></div>
+          <div class="it sub"><svg class="ico" viewBox="0 0 16 16"><circle cx="5" cy="4" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="5" cy="12" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="11" cy="6" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 5.6v4.8M11 7.6c0 2.4-6 1.6-6 2.8" fill="none" stroke="currentColor" stroke-width="1.4"/></svg><span class="g">audio-mixer</span><span class="m">3d</span></div>
+          <div class="it sub"><svg class="ico" viewBox="0 0 16 16"><circle cx="5" cy="4" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="5" cy="12" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="11" cy="6" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 5.6v4.8M11 7.6c0 2.4-6 1.6-6 2.8" fill="none" stroke="currentColor" stroke-width="1.4"/></svg><span class="g">save-system</span><span class="ab"><span class="dn">↓4</span></span></div>
+          <div class="it folder"><svg class="ico" viewBox="0 0 16 16"><path d="M2 4.5h4l1.5 1.5H14v6.5H2z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg><span class="g">fix</span><span class="m">2</span></div>
+        </div>
+      </div>
+
+      <div class="sec closed">
+        <button class="sec-h"><span class="tw">▾</span>Remotes<span class="n">origin · 9</span></button>
+        <div class="sec-b">
+          <div class="it folder"><svg class="ico" viewBox="0 0 16 16"><path d="M4 11.5h8a2.5 2.5 0 0 0 .3-5A3.5 3.5 0 0 0 5.5 6 2.8 2.8 0 0 0 4 11.5z" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><span class="g">origin</span></div>
+          <div class="it sub"><span class="g">main</span></div>
+          <div class="it sub"><span class="g">feat/save-system</span></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <button class="sec-h"><span class="tw">▾</span>Stashes<span class="n">1</span></button>
+        <div class="sec-b">
+          <div class="it"><svg class="ico" viewBox="0 0 16 16"><rect x="2.5" y="3" width="11" height="3" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M3.5 6v6.5h9V6M6.5 9h3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span class="g">WIP lighting tweaks</span><span class="m">2d</span></div>
+        </div>
+      </div>
+
+      <div class="sec closed">
+        <button class="sec-h"><span class="tw">▾</span>Tags<span class="n">4</span></button>
+        <div class="sec-b">
+          <div class="it"><span class="g">v0.3.0</span></div>
+          <div class="it"><span class="g">v0.2.1</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-foot">
+      <button title="Ignore rules"><svg class="ico" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="m4.2 11.8 7.6-7.6" stroke="currentColor" stroke-width="1.4"/></svg>Ignore</button>
+      <button title="Settings ⌘,"><svg class="ico" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6 5 5M11 11l1.4 1.4M3.6 12.4 5 11M11 5l1.4-1.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>Settings</button>
+    </div>
+  </aside>
+
+  <!-- ===================== MAIN ===================== -->
+  <div class="main">
+    <div class="toolbar">
+      <div class="tabs" role="tablist">
+        <button class="tab on" data-view-btn="changes">Changes <span class="c">5</span></button>
+        <button class="tab" data-view-btn="history">History</button>
+        <button class="tab">Insight</button>
+      </div>
+      <span class="sp"></span>
+      <button class="tb branch-btn" id="branchBtn">
+        <svg class="ico" viewBox="0 0 16 16"><circle cx="5" cy="4" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="5" cy="12" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="11" cy="6" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 5.6v4.8M11 7.6c0 2.4-6 1.6-6 2.8" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
+        feat/inventory
+        <svg class="chev" width="10" height="10" viewBox="0 0 12 12"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+      <div class="split-btn">
+        <button class="tb" title="Pull 1 commit, then push 2">
+          <svg class="ico" viewBox="0 0 16 16"><path d="M13 6.5A5 5 0 0 0 3.6 5M3 9.5A5 5 0 0 0 12.4 11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M3.2 2.5v2.8H6M12.8 13.5v-2.8H10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Sync <span class="ab"><span class="up">↑2</span> <span class="dn">↓1</span></span>
+        </button>
+        <button class="tb" id="syncBtn" aria-label="More sync options"><svg width="10" height="10" viewBox="0 0 12 12"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+      </div>
+      <button class="cmdk"><svg class="ico" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Tìm hoặc chạy lệnh<span class="k">⌘K</span></button>
+    </div>
+
+    <div class="content">
+      <!-- ============ CHANGES ============ -->
+      <section class="view changes on" data-view="changes">
+        <div class="files">
+          <div class="files-h">
+            <span class="t">5 thay đổi</span>
+            <div class="mini-seg" role="group" aria-label="Kiểu hiển thị">
+              <button id="asTree" class="on" title="Dạng cây"><svg width="14" height="14" viewBox="0 0 16 16"><path d="M3 3h4M5 3v9h3M5 7.5h3M10 7.5h3M10 12h3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
+              <button id="asList" title="Danh sách"><svg width="14" height="14" viewBox="0 0 16 16"><path d="M3 4h10M3 8h10M3 12h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
+            </div>
+          </div>
+          <div class="flist" id="tree">
+            <div class="grp">Chưa stage · 4<a>Stage tất cả</a></div>
+            <div class="f dir"><span class="cbx part"></span><span>▾</span><span class="fn">Assets/Scripts</span><span class="num"><span class="a">+21</span></span></div>
+            <div class="f ind1 sel"><span class="cbx part"></span><span class="st M">M</span><span class="fn">PlayerController.cs</span><span class="num"><span class="a">+6</span> <span class="r">−2</span></span></div>
+            <div class="f ind1"><span class="cbx"></span><span class="st U">U</span><span class="fn">InventorySlot.cs</span><span class="num"><span class="a">+15</span></span></div>
+            <div class="f dir"><span class="cbx"></span><span>▾</span><span class="fn">Assets/Scenes</span><span class="num"><span class="a">+2</span> <span class="r">−2</span></span></div>
+            <div class="f ind1"><span class="cbx"></span><span class="st M">M</span><span class="fn">Keep_Level01.unity</span><span class="num"><span class="a">+2</span> <span class="r">−2</span></span></div>
+            <div class="f"><span class="cbx"></span><span class="st M">M</span><span class="fn">ProjectSettings.asset<span class="d">ProjectSettings</span></span><span class="num"><span class="a">+1</span> <span class="r">−1</span></span></div>
+            <div class="grp">Đã stage · 1<a>Bỏ stage</a></div>
+            <div class="f"><span class="cbx on"></span><span class="st M">M</span><span class="fn">icon_lantern.png<span class="d">Assets/Art/UI</span></span><span class="num muted">ảnh</span></div>
+          </div>
+          <div class="flist" id="list" hidden>
+            <div class="grp">Chưa stage · 4<a>Stage tất cả</a></div>
+            <div class="f sel"><span class="cbx part"></span><span class="st M">M</span><span class="fn">PlayerController.cs<span class="d">Assets/Scripts</span></span><span class="num"><span class="a">+6</span> <span class="r">−2</span></span></div>
+            <div class="f"><span class="cbx"></span><span class="st U">U</span><span class="fn">InventorySlot.cs<span class="d">Assets/Scripts</span></span><span class="num"><span class="a">+15</span></span></div>
+            <div class="f"><span class="cbx"></span><span class="st M">M</span><span class="fn">Keep_Level01.unity<span class="d">Assets/Scenes</span></span><span class="num"><span class="a">+2</span> <span class="r">−2</span></span></div>
+            <div class="f"><span class="cbx"></span><span class="st M">M</span><span class="fn">ProjectSettings.asset<span class="d">ProjectSettings</span></span><span class="num"><span class="a">+1</span> <span class="r">−1</span></span></div>
+            <div class="grp">Đã stage · 1<a>Bỏ stage</a></div>
+            <div class="f"><span class="cbx on"></span><span class="st M">M</span><span class="fn">icon_lantern.png<span class="d">Assets/Art/UI</span></span><span class="num muted">ảnh</span></div>
+          </div>
+          <div class="commit">
+            <div class="in" id="commitIn">
+              <svg class="ico" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M1.5 8h3.9M10.6 8h3.9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+              <span>Viết message để commit 1 file…</span>
+            </div>
+            <div class="row" id="commitRow" hidden>
+              <label class="chk"><span class="cbx"></span>Amend</label>
+              <span class="sp"></span>
+              <span class="muted mono" style="font-size:11px">32/72</span>
+            </div>
+            <div class="row" id="commitBtn" hidden><button class="btn-primary">Commit lên feat/inventory <span style="opacity:.75">⌘↵</span></button></div>
+          </div>
+        </div>
+
+        <div class="diff">
+          <div class="diff-h">
+            <span class="path"><span>Assets/Scripts/</span>PlayerController.cs</span>
+            <span class="stat"><span style="color:var(--add)">+6</span> <span style="color:var(--del)">−2</span></span>
+            <span class="sp"></span>
+            <div class="mini-seg" role="group" aria-label="Kiểu diff">
+              <button id="uni" class="on" style="padding:2px 10px;font-size:12px">Unified</button>
+              <button id="spl" style="padding:2px 10px;font-size:12px">Split</button>
+            </div>
+          </div>
+          <div class="dscroll" id="dscroll">
+            <div class="uni">
+              <div class="hunk"><span>@@ −14,6 +14,7 @@</span><span class="fnc">public class PlayerController : MonoBehaviour</span><span class="acts"><button class="hb danger">Discard</button><button class="hb">Stage hunk</button></span></div>
+              <div class="ln"><span class="gut"></span><span class="no">14</span><span class="no">14</span><span class="sg"></span><span>    [<span class="ty">SerializeField</span>] <span class="kw">float</span> jumpForce = <span class="nu">12f</span>;</span></div>
+              <div class="ln del pick"><span class="gut"><span class="cbx on"></span></span><span class="no">15</span><span class="no"></span><span class="sg">−</span><span>    [<span class="ty">SerializeField</span>] <span class="kw">float</span> coyoteTime = <span class="nu w-del">0.1f</span>;</span></div>
+              <div class="ln add pick"><span class="gut"><span class="cbx on"></span></span><span class="no"></span><span class="no">15</span><span class="sg">+</span><span>    [<span class="ty">SerializeField</span>] <span class="kw">float</span> coyoteTime = <span class="nu w-add">0.12f</span>;</span></div>
+              <div class="ln add"><span class="gut"><span class="cbx"></span></span><span class="no"></span><span class="no">16</span><span class="sg">+</span><span>    <span class="ty">InventoryController</span> inventory;</span></div>
+              <div class="ln"><span class="gut"></span><span class="no">16</span><span class="no">17</span><span class="sg"></span><span>    <span class="ty">Rigidbody2D</span> rb;</span></div>
+              <div class="ln"><span class="gut"></span><span class="no">17</span><span class="no">18</span><span class="sg"></span><span></span></div>
+              <div class="ln"><span class="gut"></span><span class="no">18</span><span class="no">19</span><span class="sg"></span><span>    <span class="kw">void</span> <span class="fu">Awake</span>() {</span></div>
+              <div class="hunk"><span>@@ −58,7 +59,11 @@</span><span class="fnc">void Update()</span><span class="acts"><button class="hb danger">Discard</button><button class="hb">Stage hunk</button></span></div>
+              <div class="ln"><span class="gut"></span><span class="no">58</span><span class="no">59</span><span class="sg"></span><span>        <span class="fu">HandleMovement</span>();</span></div>
+              <div class="ln del"><span class="gut"><span class="cbx"></span></span><span class="no">59</span><span class="no"></span><span class="sg">−</span><span>        <span class="fu">HandleJump</span>(<span class="w-del">Input.GetButtonDown("Jump")</span>);</span></div>
+              <div class="ln add"><span class="gut"><span class="cbx"></span></span><span class="no"></span><span class="no">60</span><span class="sg">+</span><span>        <span class="fu">HandleJump</span>(<span class="w-add">jumpPressed</span>);</span></div>
+              <div class="ln add"><span class="gut"><span class="cbx"></span></span><span class="no"></span><span class="no">61</span><span class="sg">+</span><span></span></div>
+              <div class="ln add"><span class="gut"><span class="cbx"></span></span><span class="no"></span><span class="no">62</span><span class="sg">+</span><span>        <span class="com">// Tab mở túi đồ</span></span></div>
+              <div class="ln add"><span class="gut"><span class="cbx"></span></span><span class="no"></span><span class="no">63</span><span class="sg">+</span><span>        <span class="kw">if</span> (<span class="ty">Input</span>.<span class="fu">GetKeyDown</span>(<span class="ty">KeyCode</span>.Tab)) inventory.<span class="fu">Toggle</span>();</span></div>
+              <div class="ln"><span class="gut"></span><span class="no">60</span><span class="no">64</span><span class="sg"></span><span>    }</span></div>
+            </div>
+            <div class="split">
+              <div class="hunk" style="grid-column:1/-1"><span>@@ −14,6 +14,7 @@</span><span class="fnc">public class PlayerController : MonoBehaviour</span></div>
+              <div class="sl"><span class="no">14</span><span>    [<span class="ty">SerializeField</span>] <span class="kw">float</span> jumpForce = <span class="nu">12f</span>;</span></div>
+              <div class="sl"><span class="no">14</span><span>    [<span class="ty">SerializeField</span>] <span class="kw">float</span> jumpForce = <span class="nu">12f</span>;</span></div>
+              <div class="sl del"><span class="no">15</span><span>    [<span class="ty">SerializeField</span>] <span class="kw">float</span> coyoteTime = <span class="nu w-del">0.1f</span>;</span></div>
+              <div class="sl add"><span class="no">15</span><span>    [<span class="ty">SerializeField</span>] <span class="kw">float</span> coyoteTime = <span class="nu w-add">0.12f</span>;</span></div>
+              <div class="sl empty"><span class="no"></span><span></span></div>
+              <div class="sl add"><span class="no">16</span><span>    <span class="ty">InventoryController</span> inventory;</span></div>
+              <div class="sl"><span class="no">16</span><span>    <span class="ty">Rigidbody2D</span> rb;</span></div>
+              <div class="sl"><span class="no">17</span><span>    <span class="ty">Rigidbody2D</span> rb;</span></div>
+              <div class="hunk" style="grid-column:1/-1"><span>@@ −58,7 +59,11 @@</span><span class="fnc">void Update()</span></div>
+              <div class="sl del"><span class="no">59</span><span>        <span class="fu">HandleJump</span>(<span class="w-del">Input.GetButtonDown("Jump")</span>);</span></div>
+              <div class="sl add"><span class="no">60</span><span>        <span class="fu">HandleJump</span>(<span class="w-add">jumpPressed</span>);</span></div>
+              <div class="sl empty"><span class="no"></span><span></span></div>
+              <div class="sl add"><span class="no">62</span><span>        <span class="com">// Tab mở túi đồ</span></span></div>
+              <div class="sl empty"><span class="no"></span><span></span></div>
+              <div class="sl add"><span class="no">63</span><span>        <span class="kw">if</span> (<span class="ty">Input</span>.<span class="fu">GetKeyDown</span>(<span class="ty">KeyCode</span>.Tab)) inventory.<span class="fu">Toggle</span>();</span></div>
+            </div>
+          </div>
+          <div class="selbar">
+            <span class="muted">Đã chọn 2 dòng · shift-click để chọn một đoạn</span>
+            <span class="sp"></span>
+            <button class="hb">Bỏ chọn</button>
+            <button class="hb danger">Discard dòng</button>
+            <button class="btn-primary" style="flex:none;padding:0 14px;height:28px">Stage 2 dòng</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ HISTORY ============ -->
+      <section class="view history" data-view="history">
+        <div class="hl">
+          <div class="hl-h">
+            <div class="search"><svg class="ico" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Tìm theo message, tác giả, hash…</div>
+            <div class="mini-seg"><button class="on" style="padding:2px 10px;font-size:12px">Mọi branch</button><button style="padding:2px 10px;font-size:12px">Branch này</button></div>
+          </div>
+          <div class="hrows" id="hrows"></div>
+        </div>
+        <div class="det">
+          <div class="det-h">
+            <h2>Thêm kéo thả cho ô túi đồ</h2>
+            <div class="who"><span class="av" style="background:#2f7d57">H</span><b>Hằng</b> · 2 giờ trước · <span class="mono">9e1c4ab</span></div>
+            <p>Ô túi đồ nhận item khi thả vào, đổi chỗ nếu ô đã có item.
+Kèm prefab Slot mới cho lưới 6×4.</p>
+            <div class="det-acts"><button class="tb">Sửa message</button><button class="tb">Rebase từ đây…</button><button class="tb ghost">Copy hash</button></div>
+          </div>
+          <div class="det-files">
+            <div class="f sel"><span></span><span class="st A">A</span><span class="fn">DraggableItem.cs<span class="d">Assets/Scripts/Inventory</span></span><span class="num"><span class="a">+48</span></span></div>
+            <div class="f"><span></span><span class="st M">M</span><span class="fn">Slot.prefab<span class="d">Assets/Prefabs/UI</span></span><span class="num"><span class="a">+12</span> <span class="r">−3</span></span></div>
+            <div class="f"><span></span><span class="st M">M</span><span class="fn">InventoryGrid.cs<span class="d">Assets/Scripts/Inventory</span></span><span class="num"><span class="a">+9</span> <span class="r">−1</span></span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ POPOVERS ============ -->
+      <div class="pop repo-pop" id="repoPop" role="dialog" aria-label="Chọn repository">
+        <div class="srch"><svg class="ico" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Tìm repository…<span class="mono" style="margin-left:auto;font-size:11px">⌘O</span></div>
+        <div class="lab">Gần đây</div>
+        <div class="rr on"><span class="dot dirty"></span><span><b>lantern-keep</b></span><span class="b">feat/inventory</span><span class="b">5</span></div>
+        <div class="rr"><span class="dot"></span><span>KradMotion</span><span class="b">main</span><span class="b"></span></div>
+        <div class="rr"><span class="dot dirty"></span><span>arcane-gacha</span><span class="b">main</span><span class="b">6</span></div>
+        <div class="rr"><span class="dot"></span><span>unity-hexa-sort</span><span class="b">main</span><span class="b"></span></div>
+        <div class="rr"><span class="dot dirty"></span><span>Knight Match</span><span class="b">main</span><span class="b">6</span></div>
+        <div class="rr"><span class="dot"></span><span>gitty</span><span class="b">main</span><span class="b"></span></div>
+        <div class="foot">
+          <button class="tb">Clone…</button>
+          <button class="tb">Mở thư mục…</button>
+          <button class="tb">Tạo mới…</button>
+        </div>
+      </div>
+
+      <div class="pop branch-pop" id="branchPop" role="dialog" aria-label="Đổi branch" style="top:6px">
+        <div class="srch"><svg class="ico" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Tìm hoặc tạo branch…</div>
+        <div class="lab">Local</div>
+        <div class="rr on"><span class="dot"></span><span class="mono"><b>feat/inventory</b></span><span class="b">↑2</span><span></span></div>
+        <div class="rr"><span class="dot" style="background:var(--muted)"></span><span class="mono">main</span><span class="b">1d</span><span></span></div>
+        <div class="rr"><span class="dot" style="background:var(--muted)"></span><span class="mono">feat/save-system</span><span class="b">↓4</span><span></span></div>
+        <div class="lab">Remote</div>
+        <div class="rr"><span class="dot" style="background:var(--muted)"></span><span class="mono muted">origin/feat/audio-v2</span><span class="b">5h</span><span></span></div>
+        <div class="foot"><button class="tb">+ Branch mới từ đây</button></div>
+      </div>
+
+      <div class="pop sync-pop" id="syncPop" role="menu" style="top:6px">
+        <button class="mi">Fetch tất cả remote<code>f</code></button>
+        <button class="mi">Pull (1 commit mới)<code>p</code></button>
+        <button class="mi">Push (2 commit)<code>⇧P</code></button>
+        <button class="mi">Force push an toàn…<code>--force-with-lease</code></button>
+      </div>
+    </div>
+
+    <div class="sbar">
+      <span>›</span><span class="cmd">git add -p Assets/Scripts/PlayerController.cs</span>
+      <button class="undo">Hoàn tác ⌘Z</button>
+      <span class="sp"></span>
+      <span>feat/inventory · cập nhật 4 giây trước</span>
+    </div>
+  </div>
+</div>
+
+<div class="notes">
+  <span><b>Thanh tiêu đề gộp:</b> nút đỏ/vàng/xanh nằm trong sidebar, tabs nằm cùng hàng.</span>
+  <span><b>Nút chọn repo:</b> danh sách repo, Clone/Mở/Tạo mới nằm trong popover.</span>
+  <span><b>Sidebar:</b> các mục thu gọn được, lọc branch, gom <span class="mono">feat/</span> <span class="mono">fix/</span> thành thư mục.</span>
+  <span><b>Thanh công cụ:</b> branch là nút bấm; Sync gộp pull/push, kèm menu chi tiết.</span>
+  <span><b>Changes:</b> dạng cây hoặc danh sách, ô commit thu gọn thành một dòng, checkbox từng dòng ở mép trái.</span>
+  <span><b>Diff:</b> tô màu cú pháp, highlight phần chữ thay đổi, chuyển Unified/Split.</span>
+  <span><b>History:</b> tìm kiếm, gom theo ngày, avatar chữ cái đầu.</span>
+  <span><b>Màu nhấn:</b> chỉ còn ở nút chính và trạng thái được chọn.</span>
+</div>
+
+<script>
+// history rows: a small graph, grouped by day
+const rows = [
+  { day: "Hôm nay", h: "9e1c4ab", m: "Thêm kéo thả cho ô túi đồ", a: "H", c: "#2f7d57", who: "Hằng", t: "2 giờ", refs: [["head", "HEAD → feat/inventory"]], lane: 1, g: "b-top" },
+  { h: "7b20f3e", m: "Lưới túi đồ 6×4 và prefab Slot", a: "H", c: "#2f7d57", who: "Hằng", t: "5 giờ", refs: [], lane: 1, g: "b" },
+  { day: "Hôm qua", h: "c41a9d2", m: "Merge fix/jump-buffer", a: "L", c: "#8250df", who: "Linh", t: "hôm qua", refs: [["br", "main"], ["rm", "origin/main"]], lane: 0, g: "merge" },
+  { h: "52e0b7a", m: "Bake ánh sáng cho Keep_Level01", a: "L", c: "#8250df", who: "Linh", t: "hôm qua", refs: [], lane: 0, g: "a" },
+  { h: "e8d3f61", m: "Sửa coyote time và jump buffer", a: "H", c: "#2f7d57", who: "Hằng", t: "hôm qua", refs: [], lane: 2, g: "c" },
+  { day: "Tuần này", h: "a3f91c2", m: "Import texture vách đá (8K)", a: "L", c: "#8250df", who: "Linh", t: "3 ngày", refs: [], lane: 0, g: "join" },
+  { h: "1d77c09", m: "Cấu hình URP, post-processing", a: "H", c: "#2f7d57", who: "Hằng", t: "5 ngày", refs: [["tag", "v0.3.0"]], lane: 0, g: "a" },
+  { day: "Trước đó", h: "0b4e2aa", m: "Khởi tạo project Unity", a: "H", c: "#2f7d57", who: "Hằng", t: "2 tuần", refs: [], lane: 0, g: "end" },
+];
+const L = ["var(--accent)", "var(--violet)", "var(--orange)"];
+const x = (l) => 10 + l * 14;
+function graph(r) {
+  const H = 36, m = 18;
+  let p = "";
+  const v = (l, a = 0, b = H) => `<path d="M${x(l)} ${a}V${b}" stroke="${L[l]}" stroke-width="2"/>`;
+  switch (r.g) {
+    case "b-top": p += v(1, m) + v(0, 0); break;
+    case "b": p += v(1) + v(0); break;
+    case "merge": p += v(0, m) + `<path d="M${x(1)} 0V6Q${x(1)} ${m} ${x(0) + 4} ${m}" stroke="${L[1]}" stroke-width="2" fill="none"/>` + `<path d="M${x(0) + 4} ${m}Q${x(2)} ${m} ${x(2)} ${H}" stroke="${L[2]}" stroke-width="2" fill="none"/>`; break;
+    case "a": p += v(0) + (r.lane === 0 && rows.indexOf(r) < 5 ? v(2) : ""); break;
+    case "c": p += v(0) + v(2); break;
+    case "join": p += v(0) + `<path d="M${x(2)} 0Q${x(2)} ${m} ${x(0) + 4} ${m}" stroke="${L[2]}" stroke-width="2" fill="none"/>`; break;
+    case "end": p += v(0, 0, m); break;
+  }
+  const head = r.refs.some(([k]) => k === "head");
+  p += head
+    ? `<circle cx="${x(r.lane)}" cy="${m}" r="5.5" fill="var(--bg)" stroke="${L[r.lane]}" stroke-width="2.5"/>`
+    : `<circle cx="${x(r.lane)}" cy="${m}" r="4.5" fill="${L[r.lane]}" stroke="var(--bg)" stroke-width="1.5"/>`;
+  return `<svg width="52" height="${H}" aria-hidden="true">${p}</svg>`;
+}
+document.getElementById("hrows").innerHTML = rows
+  .map((r, i) => (r.day ? `<div class="day">${r.day}</div>` : "") +
+    `<div class="hr ${i === 0 ? "sel" : ""}">${graph(r)}<span class="av" style="background:${r.c}">${r.a}</span>` +
+    `<span class="msg">${r.refs.map(([k, n]) => `<span class="ref ${k}">${n}</span>`).join("")}<span>${r.m}</span></span>` +
+    `<span class="meta">${r.who} · ${r.t} · <span class="mono">${r.h}</span></span></div>`)
+  .join("");
+
+// interactions
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+function setView(v) {
+  $$("[data-view]").forEach((el) => el.classList.toggle("on", el.dataset.view === v));
+  $$("[data-view-btn]").forEach((b) => b.classList.toggle("on", b.dataset.viewBtn === v));
+}
+$$("[data-view-btn]").forEach((b) => b.addEventListener("click", () => setView(b.dataset.viewBtn)));
+$$("[data-theme-btn]").forEach((b) => b.addEventListener("click", () => {
+  document.documentElement.dataset.theme = b.dataset.themeBtn;
+  document.body.classList.toggle("dark-desk", b.dataset.themeBtn === "dark");
+  $$("[data-theme-btn]").forEach((x) => x.classList.toggle("on", x === b));
+}));
+$$(".sec-h").forEach((h) => h.addEventListener("click", () => h.parentElement.classList.toggle("closed")));
+const pops = { repoBtn: "repoPop", branchBtn: "branchPop", syncBtn: "syncPop" };
+Object.entries(pops).forEach(([btn, pop]) => $("#" + btn).addEventListener("click", (e) => {
+  e.stopPropagation();
+  const el = $("#" + pop);
+  const open = !el.classList.contains("open");
+  $$(".pop").forEach((p) => p.classList.remove("open"));
+  el.classList.toggle("open", open);
+}));
+document.addEventListener("click", (e) => { if (!e.target.closest(".pop")) $$(".pop").forEach((p) => p.classList.remove("open")); });
+$("#asTree").onclick = () => { $("#tree").hidden = false; $("#list").hidden = true; $("#asTree").classList.add("on"); $("#asList").classList.remove("on"); };
+$("#asList").onclick = () => { $("#tree").hidden = true; $("#list").hidden = false; $("#asList").classList.add("on"); $("#asTree").classList.remove("on"); };
+$("#uni").onclick = () => { $("#dscroll").classList.remove("is-split"); $("#uni").classList.add("on"); $("#spl").classList.remove("on"); };
+$("#spl").onclick = () => { $("#dscroll").classList.add("is-split"); $("#spl").classList.add("on"); $("#uni").classList.remove("on"); };
+$("#commitIn").onclick = () => {
+  const el = $("#commitIn");
+  if (el.classList.contains("focus")) return;
+  el.classList.add("focus");
+  el.innerHTML = '<span style="color:var(--fg)">Sửa coyote time và thêm phím mở túi đồ</span><span class="body">Mô tả (không bắt buộc)</span>';
+  $("#commitRow").hidden = false;
+  $("#commitBtn").hidden = false;
+};
+</script>
+</body>
+</html>

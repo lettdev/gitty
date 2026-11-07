@@ -140,6 +140,42 @@ impl Repo {
         }
     }
 
+    /// Commits on any branch whose message, author or hash matches `query`
+    /// (case-insensitive), newest first.
+    pub fn search_log(&self, query: &str, limit: usize) -> Result<Vec<Commit>> {
+        let q = query.trim();
+        if q.is_empty() {
+            return Ok(Vec::new());
+        }
+        let limit_arg = format!("-n{limit}");
+        let run = |filter: String| -> Result<Vec<Commit>> {
+            let args = ["log", "--all", "-i", "--fixed-strings", "--no-color", "--decorate=full", LOG_FORMAT, &limit_arg, &filter, "--"];
+            match self.git.run_text(&args) {
+                Ok(t) => Ok(parse_log(&t)),
+                Err(Error::Command { .. }) => Ok(Vec::new()),
+                Err(e) => Err(e),
+            }
+        };
+        let mut found = run(format!("--grep={q}"))?;
+        for c in run(format!("--author={q}"))? {
+            if !found.iter().any(|f| f.hash == c.hash) {
+                found.push(c);
+            }
+        }
+        if q.len() >= 4 && q.chars().all(|c| c.is_ascii_hexdigit()) {
+            if let Ok(t) = self.git.run_text(&["log", "-1", "--no-color", "--decorate=full", LOG_FORMAT, q, "--"]) {
+                for c in parse_log(&t) {
+                    if !found.iter().any(|f| f.hash == c.hash) {
+                        found.insert(0, c);
+                    }
+                }
+            }
+        }
+        found.sort_by_key(|c| std::cmp::Reverse(c.time));
+        found.truncate(limit);
+        Ok(found)
+    }
+
     pub fn commit_detail(&self, hash: &str) -> Result<CommitDetail> {
         let meta = self.git.run_text(&[
             "show",

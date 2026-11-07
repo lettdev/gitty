@@ -244,7 +244,7 @@ export const api = {
   createBranch: (name: string, start: string | null) => invoke<OpResult>("create_branch", { name, start }),
   stashPush: (message: string) => invoke<OpResult>("stash_push", { message }),
   stashApply: (name: string, pop: boolean) => invoke<OpResult>("stash_apply", { name, pop }),
-  remote: (op: "fetch" | "pull" | "push") => invoke<OpResult>("remote_op", { op }),
+  remote: (op: "fetch" | "pull" | "push" | "push-force" | "sync") => invoke<OpResult>("remote_op", { op }),
   insight: () => invoke<Insight>("insight"),
   largestBlobs: (force: boolean) => invoke<Blob[]>("largest_blobs", { force }),
   applyFix: (fix: object) => invoke<OpResult>("apply_fix", { fix }),
@@ -263,6 +263,9 @@ export const api = {
   cloneDefaults: () => invoke<{ parent: string }>("clone_defaults"),
   cloneName: (url: string) => invoke<string>("clone_name", { url }),
   cloneRepo: (url: string, parent: string, name: string) => invoke<RepoInfo>("clone_repo", { url, parent, name }),
+  tags: () => invoke<[string, string, number][]>("tags"),
+  searchLog: (query: string) => invoke<Commit[]>("search_log", { query }),
+  initRepo: (path: string) => invoke<RepoInfo>("init_repo", { path }),
   operation: (op: "continue" | "abort" | "skip") => invoke<OpResult>("operation", { op }),
 };
 

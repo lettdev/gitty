@@ -296,3 +296,33 @@ fn ignore_sources_why_and_edit() {
     repo.undo_last().unwrap();
     assert!(repo.why_ignored("x.tmp").unwrap().is_some());
 }
+
+#[test]
+fn search_tags_and_force_push() {
+    let d = init();
+    let p = d.path();
+    write(p, "a.txt", "1\n");
+    commit(p, "Thêm túi đồ");
+    git(p, &["tag", "v0.1.0"]);
+    write(p, "a.txt", "2\n");
+    commit(p, "Fix coyote time");
+    let repo = Repo::discover(p).unwrap();
+    let hits = repo.search_log("túi", 10).unwrap();
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0].subject, "Thêm túi đồ");
+    assert_eq!(repo.search_log("test", 10).unwrap().len(), 2, "author Test matches both");
+    let head = git(p, &["rev-parse", "HEAD"]);
+    assert_eq!(repo.search_log(&head[..8], 10).unwrap()[0].subject, "Fix coyote time");
+    assert_eq!(repo.tags().unwrap()[0].0, "v0.1.0");
+
+    // a bare remote to push to, then rewrite history and force-push with lease
+    let remote = tempfile::tempdir().unwrap();
+    git(remote.path(), &["init", "-q", "--bare", "-b", "main"]);
+    git(p, &["remote", "add", "origin", remote.path().to_str().unwrap()]);
+    repo.push(Some(("origin", "main")), |_| {}).unwrap();
+    git(p, &["commit", "-q", "--amend", "-m", "Fix coyote time (amended)"]);
+    assert!(repo.push(None, |_| {}).is_err(), "plain push is rejected after amend");
+    repo.push_force_with_lease(|_| {}).unwrap();
+    let remote_head = git(remote.path(), &["log", "-1", "--format=%s", "main"]);
+    assert_eq!(remote_head.trim(), "Fix coyote time (amended)");
+}

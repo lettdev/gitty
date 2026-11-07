@@ -5,7 +5,7 @@ import type { Cell } from "../api";
 export const CELL_W = 10;
 /** Space before the first lane so the HEAD ring isn't clipped. */
 export const GRAPH_PAD = 12;
-export const ROW_H = 30;
+export const ROW_H = 32;
 const LANES = ["var(--accent)", "var(--violet)", "var(--orange)", "var(--info)", "var(--cyan)", "var(--del)"];
 
 const UP = new Set(["│", "●", "╯", "╰", "┤", "├", "┼", "┴"]);

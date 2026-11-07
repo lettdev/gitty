@@ -68,6 +68,23 @@ impl Repo {
         Ok(branches)
     }
 
+    /// Tags, newest first: (name, short object id, unix time).
+    pub fn tags(&self) -> Result<Vec<(String, String, i64)>> {
+        let out = self.git.run_text(&[
+            "for-each-ref",
+            "--sort=-creatordate",
+            "--format=%(refname:short)%1f%(objectname:short)%1f%(creatordate:unix)",
+            "refs/tags",
+        ])?;
+        Ok(out
+            .lines()
+            .filter_map(|l| {
+                let f: Vec<&str> = l.splitn(3, '\x1f').collect();
+                (f.len() == 3).then(|| (f[0].to_string(), f[1].to_string(), f[2].parse().unwrap_or(0)))
+            })
+            .collect())
+    }
+
     pub fn remotes(&self) -> Result<Vec<String>> {
         Ok(self.git.run_text(&["remote"])?.lines().map(str::to_string).filter(|r| !r.is_empty()).collect())
     }

@@ -204,7 +204,20 @@ impl Repo {
 
     /// Push the current branch; `set_upstream` = `(remote, branch)` when it has none yet.
     pub fn push(&self, set_upstream: Option<(&str, &str)>, on_line: impl FnMut(&str)) -> Result<String> {
+        self.push_with(set_upstream, false, on_line)
+    }
+
+    /// Force push that refuses to overwrite commits you haven't seen
+    /// (`--force-with-lease`), for after a rebase or amend.
+    pub fn push_force_with_lease(&self, on_line: impl FnMut(&str)) -> Result<String> {
+        self.push_with(None, true, on_line)
+    }
+
+    fn push_with(&self, set_upstream: Option<(&str, &str)>, force: bool, on_line: impl FnMut(&str)) -> Result<String> {
         let mut args = vec!["push", "--progress"];
+        if force {
+            args.push("--force-with-lease");
+        }
         if let Some((remote, branch)) = set_upstream {
             args.extend(["-u", remote, branch]);
         }
