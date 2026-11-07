@@ -7,7 +7,7 @@ use crate::git::{Error, Result};
 use crate::oplog::OpKind;
 use crate::repo::Repo;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct IgnoreRule {
     /// 1-based line number in the file.
     pub line: usize,
@@ -15,7 +15,7 @@ pub struct IgnoreRule {
     pub comment: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct IgnoreSource {
     pub label: String,
     /// Path relative to the repo root, when the file lives inside it (editable
@@ -26,7 +26,7 @@ pub struct IgnoreSource {
     pub rules: Vec<IgnoreRule>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct WhyIgnored {
     pub source: String,
     pub line: usize,

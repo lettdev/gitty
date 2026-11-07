@@ -4,7 +4,7 @@
 
 use crate::log::Commit;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct Cell {
     pub ch: char,
     /// Lane index, used for coloring.
@@ -13,7 +13,7 @@ pub struct Cell {
 
 const BLANK: Cell = Cell { ch: ' ', lane: 0 };
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize)]
 pub struct GraphBuilder {
     /// The commit each lane is waiting for.
     lanes: Vec<Option<String>>,

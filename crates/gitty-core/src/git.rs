@@ -38,7 +38,7 @@ pub fn display_command<S: AsRef<str>>(args: &[S]) -> String {
     out
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct Git {
     workdir: PathBuf,
 }

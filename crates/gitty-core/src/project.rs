@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize)]
 pub enum ProjectKind {
     Unity,
     Godot,
@@ -81,7 +81,7 @@ impl ProjectKind {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct Project {
     pub kind: ProjectKind,
     /// Folder relative to the repo root, with a trailing slash ("" = root).
@@ -92,7 +92,7 @@ pub struct Project {
     pub marker: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct LanguageStat {
     pub name: &'static str,
     pub files: usize,

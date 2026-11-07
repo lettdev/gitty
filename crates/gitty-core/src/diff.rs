@@ -9,7 +9,7 @@ pub const MAX_DIFF_LINES: usize = 30_000;
 /// Untracked files larger than this are not previewed.
 pub const MAX_PREVIEW_BYTES: u64 = 8 * 1024 * 1024;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum LineKind {
     Context,
     Add,
@@ -24,7 +24,7 @@ impl LineKind {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct DiffLine {
     pub kind: LineKind,
     /// Line content without the leading sign. May end in `\r` for CRLF files.
@@ -33,7 +33,7 @@ pub struct DiffLine {
     pub new_no: Option<u32>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct Hunk {
     pub header: String,
     pub old_start: u32,
@@ -43,7 +43,7 @@ pub struct Hunk {
     pub lines: Vec<DiffLine>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
 pub struct FileDiff {
     /// Everything before the first hunk (`diff --git`, `index`, `---`, `+++` …).
     pub header: Vec<String>,

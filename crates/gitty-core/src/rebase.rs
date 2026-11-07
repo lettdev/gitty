@@ -10,7 +10,7 @@ use crate::git::{Error, Result, display_command};
 use crate::oplog::{OpEntry, OpKind, Snapshot, now};
 use crate::repo::{Repo, RepoState};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum RebaseAction {
     Pick,
     Reword,
@@ -31,7 +31,7 @@ impl RebaseAction {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct RebaseStep {
     pub hash: String,
     pub subject: String,

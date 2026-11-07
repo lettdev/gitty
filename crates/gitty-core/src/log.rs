@@ -3,7 +3,7 @@
 use crate::git::{Error, Result};
 use crate::repo::Repo;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum RefKind {
     /// HEAD; `name` is the checked-out branch, or "HEAD" when detached.
     Head,
@@ -12,13 +12,13 @@ pub enum RefKind {
     Tag,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct RefLabel {
     pub kind: RefKind,
     pub name: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct Commit {
     pub hash: String,
     pub parents: Vec<String>,
@@ -39,7 +39,7 @@ impl Commit {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct CommitFile {
     pub status: char,
     pub path: String,
@@ -48,7 +48,7 @@ pub struct CommitFile {
     pub dels: Option<u32>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct CommitDetail {
     pub hash: String,
     pub parents: Vec<String>,
@@ -59,7 +59,7 @@ pub struct CommitDetail {
     pub files: Vec<CommitFile>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct LogQuery {
     /// Revisions to walk, e.g. `["HEAD"]` or `["--branches", "--remotes", "--tags", "HEAD"]`.
     pub revs: Vec<String>,

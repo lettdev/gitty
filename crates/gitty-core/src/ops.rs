@@ -6,7 +6,7 @@ use crate::git::{Result, display_command};
 use crate::oplog::OpKind;
 use crate::repo::Repo;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum DiscardTarget {
     /// Restore a tracked file's worktree content from the index.
     Worktree { path: String },

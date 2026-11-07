@@ -4,7 +4,7 @@ use crate::log::CommitFile;
 use crate::oplog::{OpEntry, OpKind, StashRef, now};
 use crate::repo::Repo;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct Stash {
     /// `stash@{0}`
     pub name: String,

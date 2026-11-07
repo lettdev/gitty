@@ -1,6 +1,6 @@
 //! Parser for `git status --porcelain=v2 -z --branch`.
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum EntryKind {
     Ordinary,
     Renamed,
@@ -8,7 +8,7 @@ pub enum EntryKind {
     Untracked,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct StatusEntry {
     pub path: String,
     pub orig_path: Option<String>,
@@ -43,7 +43,7 @@ impl StatusEntry {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
 pub struct BranchStatus {
     /// `None` when HEAD is detached.
     pub head: Option<String>,
@@ -54,7 +54,7 @@ pub struct BranchStatus {
     pub behind: u32,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
 pub struct Status {
     pub branch: BranchStatus,
     pub entries: Vec<StatusEntry>,

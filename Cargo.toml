@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
-members = ["crates/gitty-core", "crates/gitty-tui"]
+members = ["crates/gitty-core", "crates/gitty-tui", "apps/desktop/src-tauri"]
+# the desktop app needs the built frontend; build it with `npm run tauri build`
+default-members = ["crates/gitty-core", "crates/gitty-tui"]
 
 [workspace.package]
 version = "0.1.0"

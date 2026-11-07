@@ -17,7 +17,7 @@ use crate::repo::Repo;
 /// Tracked files at or above this size belong in LFS.
 pub const LFS_THRESHOLD: u64 = 10 * 1024 * 1024;
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
 pub struct SizeNode {
     pub name: String,
     /// Path relative to the repo root; directories end with `/`.
@@ -40,7 +40,7 @@ impl SizeNode {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
 pub struct RepoSize {
     pub worktree: u64,
     pub worktree_files: u64,
@@ -50,14 +50,14 @@ pub struct RepoSize {
     pub lfs_store: u64,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
 pub enum Severity {
     Warn,
     Info,
     Ok,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum Fix {
     /// Append `pattern` to .gitignore and stop tracking `untrack`.
     Ignore { pattern: String, untrack: Vec<String> },
@@ -67,7 +67,7 @@ pub enum Fix {
     LfsMigrate { patterns: Vec<String> },
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct Health {
     pub severity: Severity,
     pub title: String,
@@ -87,14 +87,14 @@ pub struct Blob {
     pub commit: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
 pub struct HotFile {
     pub path: String,
     pub commits: u32,
     pub last_author: String,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
 pub struct Owner {
     pub dir: String,
     pub author: String,
@@ -102,7 +102,7 @@ pub struct Owner {
     pub commits: u32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize)]
 pub enum FileType {
     Code,
     Images,
@@ -175,7 +175,7 @@ impl FileType {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
 pub struct TypeStat {
     pub kind: Option<FileType>,
     pub bytes: u64,
@@ -208,7 +208,7 @@ pub fn file_types(files: &[(String, u64)]) -> Vec<TypeStat> {
     out
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
 pub struct Insight {
     pub projects: Vec<Project>,
     pub languages: Vec<LanguageStat>,

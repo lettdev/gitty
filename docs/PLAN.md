@@ -35,6 +35,16 @@ Nguyên tắc: logic viết một lần trong `gitty-core`, các giao diện ch�
 
 ## Phase 3: App desktop + phát hành
 
-- `apps/desktop` (Tauri 2) dùng lại `gitty-core`
-- Treemap, diff ảnh (swipe, onion skin), kéo thả rebase, `⌘K`
-- `cargo-dist`: Homebrew, Scoop/winget, `.dmg` có ký số và notarize, `.msi`, tự động cập nhật
+**Mốc 1 ✅**
+- [x] `apps/desktop` (Tauri 2 + React + TypeScript), gọi thẳng `gitty-core`
+- [x] Changes: stage theo file, hunk, dòng (chọn bằng chuột); discard; commit và amend; undo
+- [x] Diff ảnh: đặt cạnh nhau, swipe, onion skin
+- [x] History: graph SVG, chi tiết commit, sửa message
+- [x] Insight: treemap, biểu đồ thành phần, Health có nút Fix, file lớn nhất trong lịch sử
+- [x] Command palette `⌘K`; sidebar có repo, branch, stash; fetch/pull/push
+
+**Mốc 2**
+- [ ] Kéo thả để rebase, giải conflict trong app desktop
+- [ ] `cargo-dist`: Homebrew, Scoop/winget cho bản TUI
+- [ ] `.dmg` có ký số và notarize, `.msi`, tự động cập nhật
+- [ ] CI build app desktop trên 3 hệ điều hành

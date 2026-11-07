@@ -1,7 +1,7 @@
 use crate::git::Result;
 use crate::repo::Repo;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct Branch {
     /// Short name, e.g. `main` or `origin/main`.
     pub name: String,

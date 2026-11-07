@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use crate::git::{Error, Git, Result};
 use crate::status::{self, Status};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum RepoState {
     Clean,
     Merging,
@@ -26,7 +26,7 @@ impl RepoState {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct Repo {
     pub(crate) git: Git,
     root: PathBuf,

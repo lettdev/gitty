@@ -4,7 +4,7 @@ use crate::git::{Error, Result};
 use crate::oplog::OpKind;
 use crate::repo::Repo;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct Region {
     /// Index of the `<<<<<<<` line.
     pub start: usize,
@@ -18,14 +18,14 @@ pub struct Region {
     pub theirs_label: String,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
 pub struct ConflictFile {
     /// Lines including their line endings.
     pub lines: Vec<String>,
     pub regions: Vec<Region>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum Pick {
     Ours,
     Theirs,

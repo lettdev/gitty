@@ -7,7 +7,7 @@ use crate::status;
 
 const SKIP: &[&str] = &["node_modules", "target", "Library", "build", "dist", "vendor", "Pods", "DerivedData"];
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct RepoSummary {
     pub path: PathBuf,
     pub name: String,

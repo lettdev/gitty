@@ -99,11 +99,30 @@ Xem `config.example.toml` để biết mọi tuỳ chọn.
 - **Mật khẩu / passphrase:** fetch, pull, push chạy nền và không bao giờ hiện prompt lên giữa giao diện. Nếu git cần mật khẩu, bấm `!` trong thông báo lỗi để chạy lại lệnh trực tiếp trong terminal.
 - **Chuột:** click để chọn, cuộn để di chuyển. Muốn bôi đen chữ thì giữ `Shift` (hoặc `Option` trên Mac), hoặc tắt bằng `mouse = false`.
 
+## App desktop (thử nghiệm)
+
+Cùng `gitty-core` với bản terminal, nhưng có giao diện đồ hoạ:
+- **Changes:** tick checkbox để stage file; trong diff, bấm vào dòng để chọn (shift-click để chọn một đoạn), rồi stage hoặc discard; có sẵn nút cho từng hunk. Chuột phải vào file để discard.
+- **Diff ảnh:** PNG, JPG, GIF, WebP, SVG… so sánh đặt cạnh nhau, swipe hoặc onion skin.
+- **History:** commit graph vẽ bằng SVG; double-click hoặc nút *Edit message* để sửa message.
+- **Insight:** treemap dung lượng (bấm vào để vào thư mục), biểu đồ thành phần, Health có nút *Fix*, file lớn nhất trong lịch sử.
+- **`⌘K`:** command palette, mỗi lệnh hiện kèm lệnh git tương ứng. `⌘1`/`⌘2`/`⌘3` để chuyển màn, `⌘Z` để undo.
+
+Chạy thử (cần Node ≥ 20):
+
+```
+cd apps/desktop
+npm install
+npm run tauri dev        # chế độ phát triển, tự reload khi sửa code
+npm run tauri build      # build Gitty.app / .dmg (macOS), .msi (Windows)
+```
+
 ## Cấu trúc
 
 ```
 crates/gitty-core   logic repo dùng chung (gọi git CLI, parse, undo log)
 crates/gitty-tui    giao diện terminal (Ratatui + crossterm)
+apps/desktop        app desktop (Tauri 2 + React), dùng chung gitty-core
 mockups/            bản phác giao diện
 docs/PLAN.md        lộ trình
 ```
