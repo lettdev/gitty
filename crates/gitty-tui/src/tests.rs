@@ -393,3 +393,85 @@ fn repos_view_lists_sibling_repositories() {
     let target = app.take_switch().expect("switch requested");
     assert!(target.ends_with("beta"));
 }
+
+// ------------------------------------------------------------------ extras
+
+#[test]
+fn edit_message_of_an_older_commit() {
+    let dir = unity_setup();
+    let mut app = app_for(dir.path());
+    key(&mut app, KeyCode::Char('2'));
+    key(&mut app, KeyCode::Char('a'));
+    settle(&mut app);
+    key(&mut app, KeyCode::Char('j')); // "Add item 2"
+    key(&mut app, KeyCode::Char('e'));
+    let s = screen(&mut app, 120, 30);
+    println!("{s}");
+    assert!(s.contains("Edit message of"));
+    for _ in 0..12 {
+        key(&mut app, KeyCode::Backspace);
+    }
+    chars(&mut app, "Thêm vật phẩm 2");
+    key(&mut app, KeyCode::Enter);
+    settle(&mut app);
+    let out = Command::new("git").current_dir(dir.path()).args(["log", "--format=%s"]).output().unwrap();
+    let log = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(log.lines().collect::<Vec<_>>(), ["Add item 3", "Thêm vật phẩm 2", "Add item 1", "Initial Unity project"]);
+}
+
+#[test]
+fn ignore_a_file_by_extension_from_changes() {
+    let dir = setup();
+    let mut app = app_for(dir.path());
+    // the untracked markdown note is the second unstaged row
+    key(&mut app, KeyCode::Char('j'));
+    assert!(app.selected_entry().unwrap().1.path.ends_with(".md"));
+    key(&mut app, KeyCode::Char('i'));
+    let s = screen(&mut app, 120, 30);
+    println!("{s}");
+    assert!(s.contains("every .md file"));
+    key(&mut app, KeyCode::Char('2'));
+    settle(&mut app);
+    assert!(fs::read_to_string(dir.path().join(".gitignore")).unwrap().contains("*.md"));
+    assert!(!app.status.entries.iter().any(|e| e.path.ends_with(".md")));
+}
+
+#[test]
+fn ignore_rules_popup_add_check_delete() {
+    let dir = setup();
+    fs::write(dir.path().join(".gitignore"), "# build output\n/Library/\n").unwrap();
+    let mut app = app_for(dir.path());
+    key(&mut app, KeyCode::Char('I'));
+    assert!(matches!(app.popup, Some(Popup::IgnoreRules(_))));
+    key(&mut app, KeyCode::Char('a'));
+    chars(&mut app, "*.tmp");
+    key(&mut app, KeyCode::Enter);
+    settle(&mut app);
+    key(&mut app, KeyCode::Char('/'));
+    chars(&mut app, "cache.tmp");
+    key(&mut app, KeyCode::Enter);
+    let s = screen(&mut app, 120, 30);
+    println!("{s}");
+    assert!(s.contains("Ignore rules"));
+    assert!(s.contains("/Library/"));
+    assert!(s.contains("is ignored by `*.tmp`"), "{s}");
+    // select the *.tmp rule (last row of .gitignore) and delete it
+    key(&mut app, KeyCode::Char('G'));
+    key(&mut app, KeyCode::Char('d'));
+    settle(&mut app);
+    assert!(!fs::read_to_string(dir.path().join(".gitignore")).unwrap().contains("*.tmp"));
+}
+
+#[test]
+fn insight_composition_by_type() {
+    let dir = unity_setup();
+    fs::write(dir.path().join("Assets/cliff.psd"), vec![1u8; 50_000]).unwrap();
+    let mut app = app_for(dir.path());
+    key(&mut app, KeyCode::Char('4'));
+    wait(&mut app, |a| a.insight.is_some());
+    let s = screen(&mut app, 140, 44);
+    println!("{s}");
+    assert!(s.contains("Composition"));
+    assert!(s.contains("Images & textures"));
+    assert!(s.contains(".psd"));
+}

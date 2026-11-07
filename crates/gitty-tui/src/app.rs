@@ -1,5 +1,6 @@
 //! Application state and input handling.
 
+mod extras;
 mod phase2;
 
 use std::collections::HashSet;
@@ -29,6 +30,7 @@ use crate::util;
 use crate::widgets::{LineInput, TextArea};
 use crate::worker::{self, Msg, OpJob, OpOutcome, RefreshData};
 
+pub use extras::{IgnoreMenu, IgnoreRulesView, RulesInput};
 pub use phase2::{ConflictView, RebaseForm};
 
 pub const LOG_PAGE: usize = 400;
@@ -216,6 +218,9 @@ pub struct CommitForm {
     pub field: u8,
     pub amend: bool,
     pub error: Option<String>,
+    /// Editing the message of this existing commit instead of committing.
+    pub reword: Option<String>,
+    pub pushed: bool,
 }
 
 pub enum Popup {
@@ -228,6 +233,8 @@ pub enum Popup {
     ConfirmRun { title: String, message: String, args: Vec<String> },
     Rebase(RebaseForm),
     OpMenu,
+    IgnoreMenu(IgnoreMenu),
+    IgnoreRules(IgnoreRulesView),
 }
 
 pub struct Suspend {
@@ -642,6 +649,9 @@ impl App {
             None => {
                 self.notice(o.label);
                 self.after_op_insight();
+                if let Some(Popup::IgnoreRules(v)) = &mut self.popup {
+                    v.reload(&self.repo);
+                }
             }
             Some(err) => {
                 if let OpJob::DeleteBranch { name, force: false } = &o.job {
@@ -945,6 +955,8 @@ impl App {
             field: 0,
             amend,
             error: None,
+            reword: None,
+            pushed: false,
         }));
     }
 
@@ -1257,6 +1269,9 @@ impl App {
             Action::FileTheirs => self.take_whole_file(false),
             Action::ShowBase => self.show_base(),
             Action::EditFile => self.edit_file(),
+            Action::RewordCommit => self.open_reword(),
+            Action::IgnoreFile => self.open_ignore_menu(),
+            Action::IgnoreRules => self.open_ignore_rules(),
             Action::NextFocus => self.cycle_focus(true),
             Action::PrevFocus => self.cycle_focus(false),
             Action::Refresh => {
@@ -1522,11 +1537,13 @@ impl App {
                 _ => Some(Popup::ConfirmRun { title, message, args }),
             },
             Popup::Rebase(form) => self.on_rebase_key(form, &key),
+            Popup::IgnoreMenu(m) => self.on_ignore_menu_key(m, &key),
+            Popup::IgnoreRules(v) => self.on_ignore_rules_key(v, &key),
             Popup::OpMenu => self.on_opmenu_key(&key),
             Popup::Commit(mut f) => {
                 let submit = (key.code == KeyCode::Enter && f.field == 0) || (ctrl && key.code == KeyCode::Char('s'));
                 if key.code == KeyCode::Esc {
-                    if !f.amend {
+                    if !f.amend && f.reword.is_none() {
                         let draft = (f.summary.text.clone(), f.body.text());
                         if !draft.0.is_empty() || !draft.1.trim().is_empty() {
                             self.commit_draft = Some(draft);
@@ -1541,7 +1558,10 @@ impl App {
                     } else {
                         let body = f.body.text().trim().to_string();
                         let message = if body.is_empty() { summary } else { format!("{summary}\n\n{body}") };
-                        self.send_job(OpJob::Commit { message, amend: f.amend });
+                        match f.reword.clone() {
+                            Some(hash) => self.send_job(OpJob::RewordCommit { hash, message }),
+                            None => self.send_job(OpJob::Commit { message, amend: f.amend }),
+                        }
                         None
                     }
                 } else if matches!(key.code, KeyCode::Tab | KeyCode::BackTab) {

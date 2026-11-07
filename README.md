@@ -42,6 +42,9 @@ cargo install --path crates/gitty-tui
 | `f` `p` `P` | Fetch / pull / push |
 | `s` | Stash mọi thay đổi (`tab` để chọn có gồm file mới không) |
 | `r` | Ở History: interactive rebase từ commit đang chọn |
+| `e` | Ở History: sửa message của commit đang chọn (commit nào cũng được) |
+| `i` | Ở Changes: ignore file đang chọn, mọi file cùng đuôi, hoặc cả thư mục |
+| `I` | Xem và sửa mọi rule ignore; `/` để hỏi "vì sao file này bị ignore?" |
 | `m` | Khi đang merge/rebase: continue, abort hoặc skip |
 | `:` | Chạy lệnh git bất kỳ ngay trong terminal |
 | `?` | Xem toàn bộ phím |
@@ -52,6 +55,7 @@ Dòng trạng thái dưới cùng luôn hiện lệnh git tương ứng với th
 ## Insight
 
 - **Nhận diện project:** Unity, Godot, Unreal, Node (framework và package manager), Rust, Go, Python, Flutter/Dart, Swift/Xcode, .NET, Android/JVM, CMake. Kèm phiên bản engine, render pipeline, số script và tỉ lệ ngôn ngữ.
+- **Thành phần:** dung lượng theo loại file (code, ảnh/texture, audio, video, model 3D, scene/asset engine, font, tài liệu, binary), có thanh tỉ lệ và các đuôi file chiếm nhiều nhất.
 - **Dung lượng:** working tree theo thư mục (`enter` để vào, `esc` để lên), kích thước `.git` và kho LFS.
 - **Lịch sử:** file lớn nhất từng được commit, kể cả file đã xoá, kèm commit đã thêm nó (`enter` để nhảy tới). Kết quả quét được cache trong `.git/gitty/cache`, chỉ quét lại khi refs thay đổi; `R` để quét lại ngay.
 - **Health**, chọn mục rồi `enter` để sửa:
@@ -75,7 +79,7 @@ Dòng trạng thái dưới cùng luôn hiện lệnh git tương ứng với th
 
 Trước mỗi thao tác, gitty lưu lại HEAD, các branch và staging area vào `.git/gitty/oplog.jsonl`. Nội dung file bị discard được cất thành blob trong `.git`. Nhấn `u` để quay lại.
 
-Các thao tác hoàn tác được gồm: stage, commit, branch, checkout, pull, discard, sửa `.gitignore`/LFS, giải conflict, stash và drop stash, rebase.
+Các thao tác hoàn tác được gồm: stage, commit, sửa message, branch, checkout, pull, discard, sửa `.gitignore`/LFS, giải conflict, stash và drop stash, rebase.
 
 Undo sẽ **từ chối** nếu repo đã bị thay đổi từ bên ngoài sau thao tác đó (ví dụ bạn sửa lại file vừa discard), để không làm mất công việc của bạn. Push và các lệnh chạy qua `:` không hoàn tác được.
 

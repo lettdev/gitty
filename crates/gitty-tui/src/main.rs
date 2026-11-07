@@ -152,13 +152,11 @@ fn run(terminal: &mut DefaultTerminal, repo: Repo, cfg: config::Config, cfg_erro
         if let Some(s) = app.take_suspend() {
             let repo = app.repo.clone();
             let outcome = match (&s.edit, s.record) {
-                (Some(file), record) => {
-                    let desc = record.map(|r| r.1).unwrap_or_else(|| format!("Edit {file}"));
-                    repo.record(gitty_core::oplog::OpKind::Edit, desc, |r, backups| {
-                        r.backup_path(file, backups)?;
-                        run_editor(terminal, r.root(), file, mouse).map_err(|e| Error::Msg(e.to_string()))
-                    })
-                }
+                (Some(file), Some((_, desc))) => repo.record(gitty_core::oplog::OpKind::Edit, desc, |r, backups| {
+                    r.backup_path(file, backups)?;
+                    run_editor(terminal, r.root(), file, mouse).map_err(|e| Error::Msg(e.to_string()))
+                }),
+                (Some(file), None) => run_editor(terminal, repo.root(), file, mouse).map_err(|e| Error::Msg(e.to_string())),
                 (None, Some((kind, desc))) => repo.record(kind, desc, |r, _| {
                     run_interactive(terminal, r.root(), &s.args, mouse).map_err(|e| Error::Msg(e.to_string()))
                 }),

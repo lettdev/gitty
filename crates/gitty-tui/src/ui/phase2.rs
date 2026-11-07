@@ -136,8 +136,14 @@ pub(super) fn draw_insight(f: &mut Frame, app: &mut App, area: Rect) {
     }
     let [left, right] = Layout::horizontal([Constraint::Percentage(42), Constraint::Min(30)]).areas(area);
     let proj_lines = project_lines(app);
-    let ph = (proj_lines.len() as u16 + 2).min(left.height * 45 / 100).max(4);
-    let [proj, health] = Layout::vertical([Constraint::Length(ph), Constraint::Min(4)]).areas(left);
+    let ph = (proj_lines.len() as u16 + 2).min(left.height * 40 / 100).max(4);
+    let th = app.insight.as_ref().map(|i| super::extras::types_height(&i.types)).unwrap_or(0);
+    let th = if left.height >= ph + th + 8 { th } else { 0 };
+    let [proj, types, health] =
+        Layout::vertical([Constraint::Length(ph), Constraint::Length(th), Constraint::Min(4)]).areas(left);
+    if th > 0 {
+        super::extras::draw_types(f, app, types);
+    }
     let block = pane(&app.theme, &app.sym, "Project".into(), false);
     let inner = block.inner(proj);
     f.render_widget(block, proj);

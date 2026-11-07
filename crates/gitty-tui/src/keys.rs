@@ -177,6 +177,9 @@ pub enum Action {
     FileTheirs,
     ShowBase,
     EditFile,
+    RewordCommit,
+    IgnoreFile,
+    IgnoreRules,
 }
 
 pub struct ActionInfo {
@@ -243,6 +246,9 @@ actions! {
     FileTheirs, "file_theirs", ["T"], "Conflict: their version of the whole file";
     ShowBase, "show_base", ["B"], "Conflict: show the original between the sides";
     EditFile, "edit_file", ["E"], "Open the file in your editor";
+    RewordCommit, "edit_message", ["e"], "Edit the message of the selected commit";
+    IgnoreFile, "ignore", ["i"], "Ignore this file, its type or its folder";
+    IgnoreRules, "ignore_rules", ["I"], "View and edit ignore rules";
 }
 
 pub const GLOBAL: &[Action] = &[
@@ -263,11 +269,13 @@ pub const GLOBAL: &[Action] = &[
     Action::GitCommand,
     Action::StashPush,
     Action::OpMenu,
+    Action::IgnoreRules,
 ];
 
 const NAV: [Action; 6] = [Action::Up, Action::Down, Action::PageUp, Action::PageDown, Action::Top, Action::Bottom];
 
 pub const FILES: &[Action] = &[
+    Action::IgnoreFile,
     Action::Stage,
     Action::StageAll,
     Action::Discard,
@@ -302,6 +310,7 @@ pub const DIFF: &[Action] = &[
 ];
 
 pub const COMMITS: &[Action] = &[
+    Action::RewordCommit,
     Action::Rebase,
     Action::ToggleAllBranches,
     Action::CopyHash,

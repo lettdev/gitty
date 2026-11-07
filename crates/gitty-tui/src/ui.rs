@@ -1,5 +1,6 @@
 //! Rendering. Drawing never talks to git; it only reads `App`.
 
+mod extras;
 mod phase2;
 
 use gitty_core::diff::LineKind;
@@ -161,6 +162,7 @@ fn hints(app: &App) -> Vec<(String, String)> {
                 (k(Action::StageAll), "all".into()),
                 (k(Action::Commit), "commit".into()),
                 (k(Action::Discard), "discard".into()),
+                (k(Action::IgnoreFile), "ignore".into()),
                 (k(Action::Open), if app.conflict_focus_target() == Focus::Conflict { "resolve".into() } else { "diff".into() }),
             ]
         }
@@ -177,6 +179,7 @@ fn hints(app: &App) -> Vec<(String, String)> {
         }
         Focus::Commits => vec![
             (k(Action::Open), "files".into()),
+            (k(Action::RewordCommit), "edit message".into()),
             (k(Action::Rebase), "rebase from here".into()),
             (k(Action::ToggleAllBranches), if app.log_all { "current only".into() } else { "all branches".into() }),
             (k(Action::CopyHash), "copy hash".into()),
@@ -822,6 +825,8 @@ fn draw_popup(f: &mut Frame, app: &App, area: Rect) {
             f.render_widget(footer(t, &items), foot);
         }
         Popup::OpMenu => phase2::draw_opmenu(f, app, area),
+        Popup::IgnoreMenu(m) => extras::draw_ignore_menu(f, app, m, area),
+        Popup::IgnoreRules(v) => extras::draw_ignore_rules(f, app, v, area),
         Popup::Rebase(form) => phase2::draw_rebase(f, app, form, area),
         Popup::ConfirmRun { title, message, .. } => {
             let lines: Vec<Line> = message.lines().map(|l| Line::raw(clean(l))).collect();
@@ -862,7 +867,9 @@ fn draw_popup(f: &mut Frame, app: &App, area: Rect) {
         Popup::Commit(form) => {
             let branch = app.status.branch.head.clone().unwrap_or_else(|| "HEAD".into());
             let staged = app.status.entries.iter().filter(|e| e.is_staged()).count();
-            let title = if form.amend {
+            let title = if let Some(h) = &form.reword {
+                format!("Edit message of {}", &h[..h.len().min(7)])
+            } else if form.amend {
                 "Amend last commit".to_string()
             } else {
                 format!("Commit {staged} file{} to {}", if staged == 1 { "" } else { "s" }, clean(&branch))
@@ -901,8 +908,13 @@ fn draw_popup(f: &mut Frame, app: &App, area: Rect) {
             f.render_widget(Paragraph::new(body_lines), body);
             if let Some(e) = &form.error {
                 f.render_widget(Line::styled(e.clone(), Style::new().fg(t.del)), err);
+            } else if form.pushed {
+                f.render_widget(Line::styled("Already pushed — you'll need to force-push after this.", Style::new().fg(t.warn)), err);
+            } else if form.reword.is_some() {
+                f.render_widget(Line::styled("Only the message changes; staged files are left alone. u undoes it.", t.dim_style()), err);
             }
-            f.render_widget(footer(t, &[("enter", "commit"), ("tab", "description"), ("ctrl+s", "commit"), ("esc", "cancel")]), foot);
+            let verb = if form.reword.is_some() { "save" } else { "commit" };
+            f.render_widget(footer(t, &[("enter", verb), ("tab", "description"), ("ctrl+s", verb), ("esc", "cancel")]), foot);
             let pos = if form.field == 0 {
                 Position { x: (sum.x + form.summary.cursor_x()).min(sum.right().saturating_sub(1)), y: sum.y }
             } else {

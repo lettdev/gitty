@@ -241,3 +241,57 @@ fn merge_conflict_take_side_and_show_base() {
     repo.abort_operation().unwrap();
     assert_eq!(repo.state(), RepoState::Clean);
 }
+
+#[test]
+fn reword_head_and_older_commit() {
+    let d = init();
+    let p = d.path();
+    for i in 1..=3 {
+        write(p, &format!("f{i}.txt"), "x\n");
+        commit(p, &format!("commit {i}"));
+    }
+    write(p, "staged.txt", "keep me staged\n");
+    git(p, &["add", "staged.txt"]);
+    let repo = Repo::discover(p).unwrap();
+    let head = git(p, &["rev-parse", "HEAD"]).trim().to_string();
+    repo.reword_commit(&head, "Sửa message mới nhất").unwrap();
+    assert_eq!(git(p, &["log", "-1", "--format=%s"]).trim(), "Sửa message mới nhất");
+    assert!(git(p, &["diff", "--cached", "--name-only"]).contains("staged.txt"), "staged changes untouched");
+    assert!(!git(p, &["show", "--name-only", "--format=", "HEAD"]).contains("staged.txt"));
+
+    let first = git(p, &["rev-list", "--reverse", "HEAD"]).lines().next().unwrap().to_string();
+    repo.reword_commit(&first, "Đầu tiên").unwrap();
+    let log = git(p, &["log", "--format=%s"]);
+    assert_eq!(log.lines().collect::<Vec<_>>(), ["Sửa message mới nhất", "commit 2", "Đầu tiên"]);
+    assert!(git(p, &["diff", "--cached", "--name-only"]).contains("staged.txt"), "autostash restored the index");
+    repo.undo_last().unwrap();
+    assert_eq!(git(p, &["log", "--format=%s"]).lines().last(), Some("commit 1"));
+}
+
+#[test]
+fn ignore_sources_why_and_edit() {
+    let d = init();
+    let p = d.path();
+    write(p, ".gitignore", "# build\n/Library/\n*.tmp\n");
+    write(p, "Assets/.gitignore", "local.txt\n");
+    write(p, "a.txt", "a\n");
+    commit(p, "init");
+    let repo = Repo::discover(p).unwrap();
+    let src = repo.ignore_sources().unwrap();
+    let root = src.iter().find(|s| s.label == ".gitignore").unwrap();
+    assert_eq!(root.rules.len(), 3);
+    assert!(root.rules[0].comment);
+    assert!(src.iter().any(|s| s.rel.as_deref() == Some("Assets/.gitignore")));
+
+    let why = repo.why_ignored("x.tmp").unwrap().unwrap();
+    assert_eq!((why.source.as_str(), why.line, why.pattern.as_str()), (".gitignore", 3, "*.tmp"));
+    assert!(repo.why_ignored("a.txt").unwrap().is_none());
+
+    repo.add_ignore_rule(".gitignore", "*.log", &[]).unwrap();
+    assert!(repo.why_ignored("debug.log").unwrap().is_some());
+    repo.remove_ignore_rule(".gitignore", 3, "*.tmp").unwrap();
+    assert!(repo.why_ignored("x.tmp").unwrap().is_none());
+    assert!(repo.remove_ignore_rule(".gitignore", 1, "nope").is_err());
+    repo.undo_last().unwrap();
+    assert!(repo.why_ignored("x.tmp").unwrap().is_some());
+}

@@ -254,6 +254,37 @@ impl Repo {
         }
     }
 
+    /// True when a remote branch already contains `hash`.
+    pub fn is_pushed(&self, hash: &str) -> bool {
+        self.git.run_text(&["branch", "-r", "--contains", hash]).map(|o| !o.trim().is_empty()).unwrap_or(false)
+    }
+
+    /// Change the message of any commit on the current branch. HEAD is amended
+    /// directly (staged changes are left alone); older commits go through a
+    /// one-step rebase. Undoable.
+    pub fn reword_commit(&self, hash: &str, message: &str) -> Result<String> {
+        let head = self.git.run_text(&["rev-parse", "HEAD"])?.trim().to_string();
+        let short = &hash[..hash.len().min(7)];
+        if head == hash {
+            return self.record(OpKind::Commit, format!("Edit message of {short}"), |r, _| {
+                r.git.run_input(&["commit", "--amend", "--only", "--allow-empty", "--no-verify", "-F", "-"], Some(message.as_bytes()))?;
+                Ok(format!("git commit --amend --only -m \"{}\"", message.lines().next().unwrap_or_default()))
+            });
+        }
+        if !self.git.succeeds(&["merge-base", "--is-ancestor", hash, "HEAD"]) {
+            return Err(Error::Msg(format!("{short} isn't on the current branch.")));
+        }
+        let parents = self.git.run_text(&["rev-list", "--parents", "-n", "1", hash])?;
+        let base = parents.split_whitespace().nth(1).map(str::to_string);
+        let mut steps = self.rebase_plan(base.as_deref())?;
+        let Some(step) = steps.iter_mut().find(|s| s.hash == hash) else {
+            return Err(Error::Msg(format!("{short} isn't on the current branch.")));
+        };
+        step.action = RebaseAction::Reword;
+        step.message = Some(message.to_string());
+        self.run_rebase(base.as_deref(), &steps).map(|_| format!("reword {short} (git rebase -i)"))
+    }
+
     pub fn continue_operation(&self) -> Result<String> {
         let args: &[&str] = match self.state() {
             RepoState::Rebasing => &["rebase", "--continue"],

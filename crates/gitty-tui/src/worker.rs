@@ -72,6 +72,9 @@ pub enum OpJob {
     ShowBase(String),
     ResolveDelete(String),
     ApplyIgnore { pattern: String, untrack: Vec<String> },
+    AddIgnore { rel: String, pattern: String, untrack: Vec<String> },
+    RemoveIgnore { rel: String, line: usize, text: String },
+    RewordCommit { hash: String, message: String },
     LfsTrack { patterns: Vec<String>, convert: Vec<String> },
 }
 
@@ -100,7 +103,8 @@ impl OpJob {
             OpJob::Abort => "Aborting…".into(),
             OpJob::Skip => "Skipping…".into(),
             OpJob::Resolve { .. } | OpJob::TakeSide { .. } | OpJob::ShowBase(_) | OpJob::ResolveDelete(_) => "Resolving…".into(),
-            OpJob::ApplyIgnore { .. } => "Updating .gitignore…".into(),
+            OpJob::ApplyIgnore { .. } | OpJob::AddIgnore { .. } | OpJob::RemoveIgnore { .. } => "Updating ignore rules…".into(),
+            OpJob::RewordCommit { .. } => "Rewriting the message…".into(),
             OpJob::LfsTrack { .. } => "Moving files to LFS…".into(),
         }
     }
@@ -197,6 +201,16 @@ fn run_job(repo: &Repo, job: OpJob, tx: &Sender<Msg>) -> OpOutcome {
         OpJob::ShowBase(path) => ("Showing the original version between the sides".into(), repo.show_conflict_base(path)),
         OpJob::ResolveDelete(path) => (format!("Deleted {path}"), repo.resolve_delete(path)),
         OpJob::ApplyIgnore { pattern, untrack } => (format!("Ignored {pattern} — u to undo"), repo.apply_ignore(pattern, untrack)),
+        OpJob::AddIgnore { rel, pattern, untrack } => {
+            (format!("Added {pattern} to {rel} — u to undo"), repo.add_ignore_rule(rel, pattern, untrack))
+        }
+        OpJob::RemoveIgnore { rel, line, text } => {
+            (format!("Removed {text} from {rel} — u to undo"), repo.remove_ignore_rule(rel, *line, text))
+        }
+        OpJob::RewordCommit { hash, message } => {
+            let summary = message.lines().next().unwrap_or_default();
+            (format!("Message of {} is now \"{summary}\" — u to undo", &hash[..7]), repo.reword_commit(hash, message))
+        }
         OpJob::LfsTrack { patterns, convert } => {
             (format!("Tracking {} with LFS — commit to finish", patterns.join(" ")), repo.lfs_track(patterns, convert))
         }

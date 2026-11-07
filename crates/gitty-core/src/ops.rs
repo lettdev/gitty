@@ -171,26 +171,7 @@ impl Repo {
 
     /// Add a pattern to the root .gitignore and stop tracking matching paths.
     pub fn apply_ignore(&self, pattern: &str, untrack: &[String]) -> Result<String> {
-        self.record(OpKind::Edit, format!("Ignore {pattern}"), |r, backups| {
-            r.backup_path(".gitignore", backups)?;
-            let path = r.root().join(".gitignore");
-            let mut text = fs::read_to_string(&path).unwrap_or_default();
-            if !text.lines().any(|l| l.trim() == pattern) {
-                if !text.is_empty() && !text.ends_with('\n') {
-                    text.push('\n');
-                }
-                text.push_str(pattern);
-                text.push('\n');
-                fs::write(&path, text)?;
-            }
-            let mut commands = vec![format!("echo '{pattern}' >> .gitignore")];
-            if !untrack.is_empty() {
-                let mut args = vec!["rm", "-r", "--cached", "-q", "--ignore-unmatch", "--"];
-                args.extend(untrack.iter().map(String::as_str));
-                commands.push(r.exec(&args)?);
-            }
-            Ok(commands.join(" && "))
-        })
+        self.add_ignore_rule(".gitignore", pattern, untrack)
     }
 
     /// `git lfs track` the patterns and convert the current versions of `convert`.

@@ -102,10 +102,117 @@ pub struct Owner {
     pub commits: u32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum FileType {
+    Code,
+    Images,
+    Audio,
+    Video,
+    Models,
+    EngineAssets,
+    Fonts,
+    Docs,
+    Binaries,
+    Other,
+}
+
+impl FileType {
+    pub const ALL: [FileType; 10] = [
+        FileType::Code,
+        FileType::Images,
+        FileType::Audio,
+        FileType::Video,
+        FileType::Models,
+        FileType::EngineAssets,
+        FileType::Fonts,
+        FileType::Docs,
+        FileType::Binaries,
+        FileType::Other,
+    ];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            FileType::Code => "Code",
+            FileType::Images => "Images & textures",
+            FileType::Audio => "Audio",
+            FileType::Video => "Video",
+            FileType::Models => "3D models",
+            FileType::EngineAssets => "Scenes & engine assets",
+            FileType::Fonts => "Fonts",
+            FileType::Docs => "Docs & data",
+            FileType::Binaries => "Binaries & archives",
+            FileType::Other => "Other",
+        }
+    }
+
+    pub fn of(path: &str) -> FileType {
+        let name = path.rsplit('/').next().unwrap_or(path);
+        let ext = name.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase()).unwrap_or_default();
+        match ext.as_str() {
+            "cs" | "rs" | "ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs" | "py" | "go" | "gd" | "cpp" | "cc" | "cxx" | "h"
+            | "hpp" | "c" | "m" | "mm" | "swift" | "kt" | "kts" | "java" | "dart" | "shader" | "hlsl" | "cginc"
+            | "compute" | "glsl" | "gdshader" | "usf" | "ush" | "lua" | "rb" | "php" | "vue" | "svelte" | "html"
+            | "css" | "scss" | "sass" | "less" | "sh" | "bash" | "ps1" | "sql" => FileType::Code,
+            "png" | "jpg" | "jpeg" | "psd" | "psb" | "tga" | "tif" | "tiff" | "exr" | "hdr" | "bmp" | "gif" | "webp"
+            | "svg" | "kra" | "ase" | "aseprite" | "dds" | "ico" | "ktx" | "astc" => FileType::Images,
+            "wav" | "mp3" | "ogg" | "aif" | "aiff" | "flac" | "m4a" | "bank" | "fsb" | "wem" | "bnk" => FileType::Audio,
+            "mp4" | "mov" | "webm" | "avi" | "mkv" | "m4v" => FileType::Video,
+            "fbx" | "obj" | "blend" | "max" | "ma" | "mb" | "glb" | "gltf" | "dae" | "3ds" | "usd" | "usdz" | "abc" => {
+                FileType::Models
+            }
+            "unity" | "prefab" | "asset" | "mat" | "anim" | "controller" | "overridecontroller" | "meta" | "tscn"
+            | "tres" | "scn" | "res" | "umap" | "uasset" | "spriteatlas" | "playable" | "mixer" | "lighting" => {
+                FileType::EngineAssets
+            }
+            "ttf" | "otf" | "woff" | "woff2" | "fnt" => FileType::Fonts,
+            "md" | "txt" | "json" | "yaml" | "yml" | "xml" | "csv" | "toml" | "ini" | "cfg" | "pdf" | "lock" | "rst" => {
+                FileType::Docs
+            }
+            "dll" | "so" | "dylib" | "exe" | "a" | "lib" | "apk" | "aab" | "ipa" | "zip" | "7z" | "rar" | "tar" | "gz"
+            | "jar" | "bin" | "pak" | "unitypackage" | "wasm" => FileType::Binaries,
+            _ => FileType::Other,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TypeStat {
+    pub kind: Option<FileType>,
+    pub bytes: u64,
+    pub files: usize,
+    /// Largest extensions in this group, e.g. `[("psd", 812 MB), ("png", 90 MB)]`.
+    pub top: Vec<(String, u64)>,
+}
+
+/// Size per file type, largest first.
+pub fn file_types(files: &[(String, u64)]) -> Vec<TypeStat> {
+    let mut by: HashMap<FileType, (u64, usize, HashMap<String, u64>)> = HashMap::new();
+    for (path, size) in files {
+        let kind = FileType::of(path);
+        let e = by.entry(kind).or_default();
+        e.0 += size;
+        e.1 += 1;
+        let ext = path.rsplit('/').next().and_then(|n| n.rsplit_once('.')).map(|(_, x)| x.to_ascii_lowercase()).unwrap_or_else(|| "(none)".into());
+        *e.2.entry(ext).or_default() += size;
+    }
+    let mut out: Vec<TypeStat> = by
+        .into_iter()
+        .map(|(kind, (bytes, files, exts))| {
+            let mut top: Vec<(String, u64)> = exts.into_iter().collect();
+            top.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+            top.truncate(3);
+            TypeStat { kind: Some(kind), bytes, files, top }
+        })
+        .collect();
+    out.sort_by(|a, b| b.bytes.cmp(&a.bytes).then(a.kind.cmp(&b.kind)));
+    out
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Insight {
     pub projects: Vec<Project>,
     pub languages: Vec<LanguageStat>,
+    pub types: Vec<TypeStat>,
     pub size: RepoSize,
     pub tree: SizeNode,
     pub health: Vec<Health>,
@@ -265,6 +372,7 @@ impl Repo {
         }
         let projects = project::detect(self.root(), &files);
         let languages = project::languages(&files);
+        let types = file_types(&files);
         let tree = build_tree(&files);
 
         let mut size = RepoSize { worktree: tree.size, worktree_files: tree.files, ..Default::default() };
@@ -291,7 +399,7 @@ impl Repo {
         health.sort_by_key(|h| h.severity);
 
         let (hot, owners) = self.activity(&tracked_set).unwrap_or_default();
-        Ok(Insight { projects, languages, size, tree, health, hot, owners, lfs_installed })
+        Ok(Insight { projects, languages, types, size, tree, health, hot, owners, lfs_installed })
     }
 
     fn check_lfs(
@@ -609,6 +717,15 @@ mod tests {
         assert_eq!(t.children[0].children[0].path, "a/b/");
         assert_eq!(t.find("a/b/").unwrap().files, 1);
         assert!(t.find("a/b/y.bin").is_some());
+    }
+
+    #[test]
+    fn types() {
+        let t = file_types(&[("a.psd".into(), 900), ("b.png".into(), 100), ("c.cs".into(), 50), ("Makefile".into(), 5)]);
+        assert_eq!(t[0].kind, Some(FileType::Images));
+        assert_eq!(t[0].bytes, 1000);
+        assert_eq!(t[0].top[0], ("psd".to_string(), 900));
+        assert_eq!(t.last().unwrap().kind, Some(FileType::Other));
     }
 
     #[test]

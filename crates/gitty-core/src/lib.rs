@@ -10,6 +10,7 @@ pub mod conflict;
 pub mod diff;
 pub mod git;
 pub mod graph;
+pub mod ignore;
 pub mod insight;
 pub mod log;
 pub mod oplog;
