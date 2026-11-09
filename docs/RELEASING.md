@@ -47,8 +47,17 @@ Sau đó:
 
 Khoá private không bao giờ được commit. Nếu mất khoá, các bản đã cài sẽ không nhận được cập nhật nữa.
 
-## Homebrew và Scoop
+## Homebrew, winget và Scoop (bản terminal)
 
-Có sẵn mẫu trong `packaging/`:
-- `packaging/homebrew/gitty.rb`: chép vào một repo tap (`lettdev/homebrew-tap`), thay `VERSION` và mã SHA256 lấy từ file `.sha256` của bản phát hành. Người dùng cài bằng `brew install lettdev/tap/gitty`.
-- `packaging/scoop/gitty.json`: chép vào một bucket Scoop. Phần `autoupdate` giúp Scoop tự nhận bản mới.
+Mẫu nằm trong `packaging/`. Workflow Release tự điền phiên bản và SHA256 (`packaging/fill.sh`) rồi để kết quả ở artifact `package-manifests-<tag>` của lần chạy đó:
+
+```
+gh run download <run-id> -n package-manifests-v0.2.3 -D /tmp/manifests
+```
+
+Chỉ gửi đi **sau khi đã publish** bản phát hành, vì các trình cài đặt tải file từ link công khai.
+
+- **Homebrew (macOS, Apple silicon):** chép `homebrew/gitty.rb` vào `Formula/gitty.rb` của repo `lettdev/homebrew-tap`. Người dùng cài bằng `brew install lettdev/tap/gitty`. Homebrew tải bằng curl nên macOS không chặn file chưa ký.
+- **winget (Windows):** chép thư mục `winget/manifests/...` vào một fork của `microsoft/winget-pkgs`, kiểm tra bằng `winget validate --manifest <thư mục>` rồi mở pull request. Người dùng cài bằng `winget install lettdev.Gitty`.
+- **Scoop (Windows):** chép `scoop/gitty.json` vào một bucket Scoop. Phần `autoupdate` giúp Scoop tự nhận bản mới.
+

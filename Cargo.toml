@@ -8,6 +8,7 @@ default-members = ["crates/gitty-core", "crates/gitty-tui"]
 version = "0.2.2"
 edition = "2024"
 rust-version = "1.85"
+license = "MIT"
 repository = "https://github.com/lettdev/gitty"
 
 [workspace.dependencies]

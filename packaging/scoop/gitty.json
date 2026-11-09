@@ -2,7 +2,7 @@
   "version": "VERSION",
   "description": "Friendly git client for the terminal",
   "homepage": "https://github.com/lettdev/gitty",
-  "license": "LICENSE",
+  "license": "MIT",
   "depends": "git",
   "architecture": {
     "64bit": {

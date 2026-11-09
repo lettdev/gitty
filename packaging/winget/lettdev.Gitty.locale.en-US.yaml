@@ -1,0 +1,22 @@
+# Template: replace VERSION before submitting.
+PackageIdentifier: lettdev.Gitty
+PackageVersion: VERSION
+PackageLocale: en-US
+Publisher: lettdev
+PublisherUrl: https://github.com/lettdev
+PublisherSupportUrl: https://github.com/lettdev/gitty/issues
+PackageName: Gitty
+PackageUrl: https://github.com/lettdev/gitty
+License: MIT
+LicenseUrl: https://github.com/lettdev/gitty/blob/main/LICENSE
+ShortDescription: A friendly git client for the terminal.
+Description: Gitty is a terminal git client that is as fast as the command line and as easy to read as a GUI. Stage by file, hunk or line, browse history as a graph, resolve conflicts and undo any operation.
+Moniker: gitty
+Tags:
+  - git
+  - tui
+  - terminal
+  - version-control
+ReleaseNotesUrl: https://github.com/lettdev/gitty/releases/tag/vVERSION
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

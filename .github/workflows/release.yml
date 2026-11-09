@@ -5,6 +5,8 @@ name: Release
 #   macOS (Apple silicon): Gitty.app zipped, gitty terminal binary
 #   Windows (x64):         Gitty.exe, gitty.exe terminal binary
 # macOS signing only happens when the Apple secrets exist; see docs/RELEASING.md.
+# A last job fills the Homebrew / Scoop / winget manifests (artifact
+# "package-manifests-<tag>").
 on:
   push:
     tags: ["v*"]
@@ -75,11 +77,11 @@ jobs:
           mkdir dist
           if [ "$RUNNER_OS" = macOS ]; then
             ditto -c -k --keepParent target/release/bundle/macos/Gitty.app "dist/Gitty-$v-$p.zip"
-            mkdir "gitty-$v-$p" && cp target/release/gitty README.md config.example.toml "gitty-$v-$p"/
+            mkdir "gitty-$v-$p" && cp target/release/gitty README.md LICENSE config.example.toml "gitty-$v-$p"/
             tar czf "dist/gitty-$v-$p.tar.gz" "gitty-$v-$p"
           else
             cp target/release/gitty-desktop.exe "dist/Gitty-$v-$p.exe"
-            mkdir "gitty-$v-$p" && cp target/release/gitty.exe README.md config.example.toml "gitty-$v-$p"/
+            mkdir "gitty-$v-$p" && cp target/release/gitty.exe README.md LICENSE config.example.toml "gitty-$v-$p"/
             7z a "dist/gitty-$v-$p.zip" "gitty-$v-$p" > /dev/null
           fi
           cd dist
@@ -93,3 +95,26 @@ jobs:
           draft: true
           name: Gitty ${{ github.ref_name }}
           files: dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sums-${{ matrix.platform }}
+          path: dist/*.sha256
+
+  # Homebrew, Scoop and winget manifests filled in for this release, as a
+  # workflow artifact (not a release asset): download it to submit them.
+  manifests:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sums-*
+          merge-multiple: true
+          path: sums
+      - run: packaging/fill.sh "${GITHUB_REF_NAME}" sums out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-manifests-${{ github.ref_name }}
+          path: out
