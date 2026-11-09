@@ -2,6 +2,7 @@
 
 mod extras;
 mod phase2;
+mod sync;
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -32,6 +33,7 @@ use crate::worker::{self, Msg, OpJob, OpOutcome, RefreshData};
 
 pub use extras::{IgnoreMenu, IgnoreRulesView, RulesInput};
 pub use phase2::{ConflictView, RebaseForm};
+pub use sync::{PushPreview, cat_frame, plural};
 
 pub const LOG_PAGE: usize = 400;
 const DETAIL_DELAY: Duration = Duration::from_millis(80);
@@ -235,6 +237,9 @@ pub enum Popup {
     OpMenu,
     IgnoreMenu(IgnoreMenu),
     IgnoreRules(IgnoreRulesView),
+    /// What a push will send; Enter sends it.
+    Push(PushPreview),
+    About,
 }
 
 pub struct Suspend {
@@ -264,6 +269,8 @@ pub struct App {
     pub sym: Symbols,
     pub keys: Keymap,
     pub mouse: bool,
+    /// Show what a push will send before sending it.
+    confirm_push: bool,
 
     pub view: View,
     pub focus: Focus,
@@ -378,6 +385,7 @@ impl App {
             sym: Symbols::detect(&cfg.symbols),
             keys,
             mouse: cfg.mouse,
+            confirm_push: cfg.confirm_push,
             repo,
             view: View::Changes,
             focus: Focus::Files,
@@ -563,7 +571,7 @@ impl App {
             self.notice = None;
             self.dirty = true;
         }
-        if self.busy > 0 {
+        if self.busy > 0 || matches!(self.popup, Some(Popup::About)) {
             self.dirty = true;
         }
     }
@@ -653,7 +661,13 @@ impl App {
         }
         match o.error {
             None => {
-                self.notice(o.label);
+                let mut label = o.label;
+                if matches!(o.job, OpJob::Commit { amend: false, .. }) {
+                    if let Some(hint) = self.after_commit_hint() {
+                        label = format!("{label} — {hint}");
+                    }
+                }
+                self.notice(label);
                 self.after_op_insight();
                 if let Some(Popup::IgnoreRules(v)) = &mut self.popup {
                     v.reload(&self.repo);
@@ -1246,6 +1260,7 @@ impl App {
         match a {
             Action::Quit => self.quit = true,
             Action::Help => self.popup = Some(Popup::Help { scroll: 0 }),
+            Action::About => self.popup = Some(Popup::About),
             Action::ViewChanges => self.set_view(View::Changes),
             Action::ViewHistory => self.set_view(View::History),
             Action::ViewBranches => self.set_view(View::Branches),
@@ -1450,32 +1465,12 @@ impl App {
         }
     }
 
-    fn push(&mut self) {
-        let b = &self.status.branch;
-        let Some(head) = b.head.clone() else {
-            self.notice_err("HEAD is detached — switch to a branch before pushing.");
-            return;
-        };
-        let set_upstream = if b.upstream.is_some() {
-            None
-        } else {
-            let remote = if self.remotes.iter().any(|r| r == "origin") { Some("origin".to_string()) } else { self.remotes.first().cloned() };
-            match remote {
-                Some(r) => Some((r, head)),
-                None => {
-                    self.notice_err("No remote configured. Add one with `:remote add origin <url>`.");
-                    return;
-                }
-            }
-        };
-        self.send_job(OpJob::Push { set_upstream });
-    }
-
     fn on_popup_key(&mut self, key: KeyEvent) {
         let Some(popup) = self.popup.take() else { return };
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         let keep = match popup {
             Popup::Help { mut scroll } => match key.code {
+                KeyCode::Char('a') => Some(Popup::About),
                 KeyCode::Char('j') | KeyCode::Down => {
                     scroll = scroll.saturating_add(1);
                     Some(Popup::Help { scroll })
@@ -1545,6 +1540,8 @@ impl App {
             Popup::Rebase(form) => self.on_rebase_key(form, &key),
             Popup::IgnoreMenu(m) => self.on_ignore_menu_key(m, &key),
             Popup::IgnoreRules(v) => self.on_ignore_rules_key(v, &key),
+            Popup::Push(p) => self.on_push_key(p, &key),
+            Popup::About => self.on_about_key(&key),
             Popup::OpMenu => self.on_opmenu_key(&key),
             Popup::Commit(mut f) => {
                 let submit = (key.code == KeyCode::Enter && f.field == 0) || (ctrl && key.code == KeyCode::Char('s'));

@@ -480,3 +480,119 @@ fn insight_composition_by_type() {
     assert!(s.contains("Images & textures"));
     assert!(s.contains(".psd"));
 }
+
+/// `setup()` plus a bare "server" repository as origin, with main already pushed.
+fn setup_with_remote() -> (tempfile::TempDir, tempfile::TempDir) {
+    let dir = setup();
+    let server = tempfile::tempdir().unwrap();
+    git(server.path(), &["init", "-q", "--bare", "-b", "main"]);
+    git(dir.path(), &["remote", "add", "origin", server.path().to_str().unwrap()]);
+    git(dir.path(), &["push", "-q", "-u", "origin", "main"]);
+    (dir, server)
+}
+
+fn server_log(server: &Path, rev: &str) -> String {
+    let out = Command::new("git").current_dir(server).args(["log", "--format=%s", rev, "--"]).output().unwrap();
+    String::from_utf8_lossy(&out.stdout).into_owned()
+}
+
+#[test]
+fn push_shows_a_preview_and_hints() {
+    let (dir, server) = setup_with_remote();
+    let mut app = app_for(dir.path());
+    // nothing unpushed yet: no push hint, and P just says so
+    assert!(!screen(&mut app, 140, 30).contains("push 1"));
+    key(&mut app, KeyCode::Char('P'));
+    assert!(app.popup.is_none());
+    assert!(app.notice.as_ref().unwrap().text.contains("up to date"), "{:?}", app.notice.as_ref().map(|n| &n.text));
+
+    git(dir.path(), &["commit", "-qam", "Coyote time"]);
+    app.request_refresh(true);
+    settle(&mut app);
+    let s = screen(&mut app, 140, 30);
+    println!("{s}");
+    assert!(s.contains("P push 1"), "hint bar should offer the push:\n{s}");
+
+    key(&mut app, KeyCode::Char('P'));
+    assert!(matches!(app.popup, Some(Popup::Push(_))));
+    let s = screen(&mut app, 140, 30);
+    println!("{s}");
+    assert!(s.contains("Push to origin/main"));
+    assert!(s.contains("Coyote time"));
+    // Esc backs out without pushing
+    key(&mut app, KeyCode::Esc);
+    assert!(app.popup.is_none());
+    assert!(!server_log(server.path(), "main").contains("Coyote time"));
+
+    key(&mut app, KeyCode::Char('P'));
+    key(&mut app, KeyCode::Enter);
+    settle(&mut app);
+    assert!(server_log(server.path(), "main").contains("Coyote time"));
+}
+
+#[test]
+fn first_push_publishes_the_branch() {
+    let (dir, server) = setup_with_remote();
+    git(dir.path(), &["switch", "-q", "-c", "feat/dash"]);
+    git(dir.path(), &["commit", "-qam", "Dash"]);
+    let mut app = app_for(dir.path());
+    assert!(screen(&mut app, 140, 30).contains("P publish"));
+    key(&mut app, KeyCode::Char('P'));
+    let s = screen(&mut app, 140, 30);
+    println!("{s}");
+    assert!(s.contains("Publish feat/dash"));
+    assert!(s.contains("isn't on origin yet"));
+    assert!(s.contains("Dash"));
+    assert!(!s.contains("Initial Unity project"), "commits already on the remote aren't listed");
+    key(&mut app, KeyCode::Enter);
+    settle(&mut app);
+    assert!(server_log(server.path(), "feat/dash").contains("Dash"));
+    assert_eq!(app.status.branch.upstream.as_deref(), Some("origin/feat/dash"));
+}
+
+#[test]
+fn push_without_confirmation_when_turned_off() {
+    let (dir, server) = setup_with_remote();
+    git(dir.path(), &["commit", "-qam", "Straight up"]);
+    let cfg = Config { symbols: "unicode".into(), color: "16".into(), confirm_push: false, ..Config::default() };
+    let mut app = App::new(Repo::discover(dir.path()).unwrap(), cfg, None);
+    wait(&mut app, |a| a.loaded_once);
+    key(&mut app, KeyCode::Char('P'));
+    assert!(app.popup.is_none());
+    settle(&mut app);
+    assert!(server_log(server.path(), "main").contains("Straight up"));
+}
+
+#[test]
+fn commit_suggests_pushing() {
+    let (dir, _server) = setup_with_remote();
+    let mut app = app_for(dir.path());
+    key(&mut app, KeyCode::Char('a'));
+    settle(&mut app);
+    key(&mut app, KeyCode::Char('c'));
+    chars(&mut app, "Jump buffer");
+    key(&mut app, KeyCode::Enter);
+    settle(&mut app);
+    let text = app.notice.as_ref().map(|n| n.text.clone()).unwrap_or_default();
+    assert!(text.contains("Committed") && text.contains("P to push"), "{text}");
+}
+
+#[test]
+fn about_screen_shows_the_cat() {
+    let dir = setup();
+    let mut app = app_for(dir.path());
+    key(&mut app, KeyCode::Char('?'));
+    let s = screen(&mut app, 120, 40);
+    println!("{s}");
+    assert!(s.contains("about gitty"));
+    assert!(s.contains("Sync with the remote"), "{s}");
+    key(&mut app, KeyCode::Char('a'));
+    assert!(matches!(app.popup, Some(Popup::About)));
+    let s = screen(&mut app, 120, 40);
+    println!("{s}");
+    assert!(s.contains(r"\_______/"), "{s}");
+    assert!(s.contains("git + kitty"));
+    assert!(s.contains(env!("CARGO_PKG_VERSION")));
+    key(&mut app, KeyCode::Esc);
+    assert!(app.popup.is_none());
+}

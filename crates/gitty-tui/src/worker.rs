@@ -170,7 +170,7 @@ fn run_job(repo: &Repo, job: OpJob, tx: &Sender<Msg>) -> OpOutcome {
         }
         OpJob::Pull => {
             retry = Some(strings(&["pull"]));
-            ("Pulled".into(), repo.pull(progress))
+            ("Pulled — u to undo".into(), repo.pull(progress))
         }
         OpJob::Push { set_upstream } => {
             let mut args = strings(&["push"]);

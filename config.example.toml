@@ -12,6 +12,10 @@ mouse = true
 # History starts with all branches; press `a` there to toggle.
 all_branches = true
 
+# P shows the commits a push will send and waits for Enter.
+# Set to false to push straight away.
+confirm_push = true
+
 # Folders scanned for repositories in the Repos view (5).
 # Default: the folder that contains the current repository.
 # workspaces = ["~/Works", "~/code"]

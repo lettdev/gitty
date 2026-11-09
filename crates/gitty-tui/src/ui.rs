@@ -2,6 +2,7 @@
 
 mod extras;
 mod phase2;
+mod sync;
 
 use gitty_core::diff::LineKind;
 use gitty_core::log::{RefKind, RefLabel};
@@ -214,6 +215,10 @@ fn hints(app: &App) -> Vec<(String, String)> {
         Focus::Hot => vec![(k(Action::NextFocus), "next pane".into())],
         Focus::Repos => vec![(k(Action::Open), "open".into()), (k(Action::Refresh), "rescan".into())],
     };
+    // what's waiting to go up or come down goes first, on every screen
+    for (i, hint) in app.sync_hints().into_iter().enumerate() {
+        h.insert(i, hint);
+    }
     if app.state != gitty_core::RepoState::Clean {
         h.insert(0, (k(Action::OpMenu), format!("{} menu", app.state.label().unwrap_or("").to_lowercase())));
     }
@@ -744,7 +749,9 @@ fn footer(t: &Theme, items: &[(&str, &str)]) -> Line<'static> {
 }
 
 fn help_lines(app: &App) -> Vec<Line<'static>> {
-    let groups: [(&str, &[Action]); 10] = [
+    const SYNC: &[Action] = &[Action::Push, Action::Pull, Action::Fetch];
+    let groups: [(&str, &[Action]); 11] = [
+        ("Sync with the remote", SYNC),
         ("Everywhere", keys::GLOBAL),
         ("Files", keys::FILES),
         ("Diff", keys::DIFF),
@@ -767,7 +774,7 @@ fn help_lines(app: &App) -> Vec<Line<'static>> {
             }
             continue;
         }
-        for a in actions.iter().filter(|a| title == "Files" || !nav.contains(a)) {
+        for a in actions.iter().filter(|a| title == "Files" || !nav.contains(a)).filter(|a| title == "Sync with the remote" || !SYNC.contains(a)) {
             lines.push(Line::from(vec![
                 Span::styled(format!("  {:<16}", app.keys.all_keys(*a)), Style::new().fg(t.info)),
                 Span::raw(keys::info(*a).desc),
@@ -793,7 +800,7 @@ fn draw_popup(f: &mut Frame, app: &App, area: Rect) {
             f.render_widget(block, rect);
             let [body, foot] = Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).areas(inner);
             f.render_widget(Paragraph::new(help_lines(app)).scroll((*scroll, 0)), body.inner(ratatui::layout::Margin { horizontal: 1, vertical: 0 }));
-            f.render_widget(footer(t, &[("j/k", "scroll"), ("esc", "close")]), foot);
+            f.render_widget(footer(t, &[("j/k", "scroll"), ("a", "about gitty"), ("esc", "close")]), foot);
         }
         Popup::Confirm { title, message, .. } => {
             let lines: Vec<Line> = message.lines().map(|l| Line::raw(clean(l))).collect();
@@ -824,6 +831,8 @@ fn draw_popup(f: &mut Frame, app: &App, area: Rect) {
             }
             f.render_widget(footer(t, &items), foot);
         }
+        Popup::Push(p) => sync::draw_push(f, app, p, area),
+        Popup::About => sync::draw_about(f, app, area),
         Popup::OpMenu => phase2::draw_opmenu(f, app, area),
         Popup::IgnoreMenu(m) => extras::draw_ignore_menu(f, app, m, area),
         Popup::IgnoreRules(v) => extras::draw_ignore_rules(f, app, v, area),

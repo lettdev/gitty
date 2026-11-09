@@ -180,6 +180,7 @@ pub enum Action {
     RewordCommit,
     IgnoreFile,
     IgnoreRules,
+    About,
 }
 
 pub struct ActionInfo {
@@ -198,6 +199,7 @@ macro_rules! actions {
 actions! {
     Quit, "quit", ["q", "ctrl+c"], "Quit gitty";
     Help, "help", ["?"], "Show all keys";
+    About, "about", [], "About gitty (also: a in the keys screen)";
     ViewChanges, "view_changes", ["1"], "Changes view";
     ViewHistory, "view_history", ["2"], "History view";
     ViewBranches, "view_branches", ["3"], "Branches & stashes view";
@@ -254,6 +256,7 @@ actions! {
 pub const GLOBAL: &[Action] = &[
     Action::Quit,
     Action::Help,
+    Action::About,
     Action::ViewChanges,
     Action::ViewHistory,
     Action::ViewBranches,

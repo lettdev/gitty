@@ -16,6 +16,8 @@ pub struct Config {
     pub mouse: bool,
     /// Show all branches in History (toggle with `a`).
     pub all_branches: bool,
+    /// Show what a push will send and wait for Enter before pushing.
+    pub confirm_push: bool,
     /// Folders scanned for repositories in the Repos view (default: the
     /// folder containing the current repository).
     pub workspaces: Vec<String>,
@@ -25,7 +27,7 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        Self { symbols: "auto".into(), color: "auto".into(), mouse: true, all_branches: true, workspaces: Vec::new(), keys: HashMap::new() }
+        Self { symbols: "auto".into(), color: "auto".into(), mouse: true, all_branches: true, confirm_push: true, workspaces: Vec::new(), keys: HashMap::new() }
     }
 }
 

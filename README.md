@@ -46,7 +46,7 @@ cargo install --path crates/gitty-tui
 | `c` / `A` / `C` | Commit / amend / commit bằng `$EDITOR` |
 | `d` | Discard (luôn có bản backup, `u` để hoàn tác) |
 | `u` | **Hoàn tác** thao tác gitty gần nhất |
-| `f` `p` `P` | Fetch / pull / push |
+| `f` `p` `P` | Fetch / pull / push. `P` hiện trước các commit sẽ được gửi lên, `enter` để push (tắt bằng `confirm_push = false`). Thanh dưới cùng nhắc `P push 2` khi có commit chưa push |
 | `s` | Stash mọi thay đổi (`tab` để chọn có gồm file mới không) |
 | `r` | Ở History: interactive rebase từ commit đang chọn |
 | `e` | Ở History: sửa message của commit đang chọn (commit nào cũng được) |
@@ -54,7 +54,7 @@ cargo install --path crates/gitty-tui
 | `I` | Xem và sửa mọi rule ignore; `/` để hỏi "vì sao file này bị ignore?" |
 | `m` | Khi đang merge/rebase: continue, abort hoặc skip |
 | `:` | Chạy lệnh git bất kỳ ngay trong terminal |
-| `?` | Xem toàn bộ phím |
+| `?` | Xem toàn bộ phím (trong đó bấm `a` để xem About) |
 | `q` | Thoát |
 
 Dòng trạng thái dưới cùng luôn hiện lệnh git tương ứng với thao tác vừa làm.
@@ -140,3 +140,7 @@ docs/PLAN.md        lộ trình
 cargo test        # test core và test giao diện trên repo tạm thật
 cargo run -- .    # chạy gitty trên chính repo này
 ```
+
+## Giấy phép
+
+MIT, xem [LICENSE](LICENSE).
