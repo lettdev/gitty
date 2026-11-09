@@ -534,6 +534,12 @@ impl App {
         self.dirty = true;
     }
 
+    /// No operation running and no status refresh queued or in flight.
+    #[cfg(test)]
+    pub fn is_idle(&self) -> bool {
+        self.busy == 0 && !self.refresh_inflight && !self.refresh_pending && self.fs_dirty.is_none()
+    }
+
     pub fn tick(&mut self) {
         while let Ok(msg) = self.rx.try_recv() {
             self.on_msg(msg);

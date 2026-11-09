@@ -56,19 +56,21 @@ fn wait(app: &mut App, cond: impl Fn(&App) -> bool) {
     let start = Instant::now();
     while !cond(app) {
         app.tick();
-        assert!(start.elapsed() < Duration::from_secs(10), "timed out waiting");
+        assert!(start.elapsed() < Duration::from_secs(30), "timed out waiting");
         std::thread::sleep(Duration::from_millis(10));
     }
 }
 
 /// Wait until queued operations are done and the follow-up refresh landed.
 fn settle(app: &mut App) {
+    // waiting on state, not a fixed sleep: slow CI runners (Windows) need longer
     wait(app, |a| a.busy == 0);
     std::thread::sleep(Duration::from_millis(100));
     for _ in 0..30 {
         app.tick();
         std::thread::sleep(Duration::from_millis(10));
     }
+    wait(app, |a| a.is_idle());
 }
 
 fn key(app: &mut App, code: KeyCode) {
