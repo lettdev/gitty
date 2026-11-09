@@ -14,6 +14,17 @@ gitty ~/code/x   # mở repo khác
 - **Windows (x64):** `Gitty-…-windows-x64.exe`, chạy thẳng.
 - **Bản terminal:** `gitty-…-macos-arm64.tar.gz` hoặc `gitty-…-windows-x64.zip`.
 
+## Cài bản terminal bằng một lệnh
+
+- **macOS (Apple Silicon):** `brew install lettdev/tap/gitty` (cập nhật bằng `brew upgrade gitty`)
+- **Windows (PowerShell):** không cần quyền admin, chạy lại để cập nhật
+
+  ```powershell
+  irm https://raw.githubusercontent.com/lettdev/gitty/main/install.ps1 | iex
+  ```
+
+Cả hai cần `git` có sẵn trong PATH.
+
 ## Cài từ source
 
 Cần Rust ≥ 1.85 và `git` có sẵn trong PATH.
