@@ -518,6 +518,26 @@ function PromptDialog({ p, onDone }: { p: Prompt; onDone: (v: string | null) => 
   );
 }
 
+/** The app icon's cat, for the welcome screen. */
+function CatMark() {
+  return (
+    <svg className="catmark" viewBox="92 92 840 840" width="56" height="56" aria-hidden="true">
+      <defs>
+        <clipPath id="catmark-clip"><rect x="92" y="92" width="840" height="840" rx="200" /></clipPath>
+      </defs>
+      <rect x="92" y="92" width="840" height="840" rx="200" fill="#141a17" />
+      <g clipPath="url(#catmark-clip)">
+        <g transform="translate(92 92) scale(0.8203125)">
+          <path d="M180 1100 L180 560 C180 520 190 470 210 430 L250 250 L400 360 Q512 335 624 360 L774 250 L814 430 C834 470 844 520 844 560 L844 1100 Z" fill="#4cc79b" />
+          <circle cx="410" cy="600" r="46" fill="#0f1412" />
+          <circle cx="614" cy="600" r="46" fill="#0f1412" />
+          <path d="M488 700 L536 700 L512 726 Z" fill="#0f1412" stroke="#0f1412" strokeWidth="14" strokeLinejoin="round" />
+        </g>
+      </g>
+    </svg>
+  );
+}
+
 function Welcome({ onOpen, onBrowse, onClone }: { onOpen: (p: string) => void; onBrowse: () => void; onClone: () => void }) {
   const [repos, setRepos] = useState<RepoSummary[] | null>(null);
   useEffect(() => {
@@ -526,8 +546,9 @@ function Welcome({ onOpen, onBrowse, onClone }: { onOpen: (p: string) => void; o
   return (
     <div className="welcome">
       <div className="box">
+        <CatMark />
         <h1>Open a repository</h1>
-        <p className="muted" style={{ margin: 0 }}>Pick a folder that contains a git repository, clone one from a URL, or reopen a recent one.</p>
+        <p className="muted" style={{ margin: 0 }}>Pick a project folder (Gitty can set up git in it if needed), clone one from a URL, or reopen a recent one.</p>
         <div className="row">
           <button className="btn primary" onClick={onBrowse}>Choose folder…</button>
           <button className="btn" onClick={onClone}>Clone from URL…</button>

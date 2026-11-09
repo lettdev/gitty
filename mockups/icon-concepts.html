@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gitty Icon Concepts</title>
+<style>
+:root { --bg:#f4f6f5; --card:#ffffff; --fg:#18201c; --muted:#5d6762; --line:#e2e7e4; color-scheme: light dark; }
+@media (prefers-color-scheme: dark) { :root { --bg:#0f1213; --card:#181c1e; --fg:#e8ecea; --muted:#9aa49f; --line:#2a3033; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+main { max-width:1180px; margin:0 auto; padding:40px 16px 64px; }
+h1 { margin:0 0 6px; font-size:26px; }
+.lead { margin:0 0 28px; color:var(--muted); max-width:70ch; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:18px; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; display:flex; flex-direction:column; gap:10px; }
+.hero { display:flex; justify-content:center; padding:8px 0 4px; }
+.hero svg { filter: drop-shadow(0 8px 18px rgba(0,0,0,.22)); max-width:100%; height:auto; }
+h2 { margin:4px 0 0; font-size:17px; }
+p { margin:0; color:var(--muted); font-size:14px; }
+.row { display:flex; align-items:flex-end; gap:16px; padding:12px; border-radius:10px; }
+.row.dark { background:#1d2124; } .row.light { background:#e9ecea; }
+figure { margin:0; display:flex; flex-direction:column; align-items:center; gap:4px; }
+figcaption { font-size:11px; color:#8b9590; }
+.notes { margin-top:28px; color:var(--muted); font-size:14px; }
+.notes li { margin:4px 0; }
+</style>
+</head>
+<body>
+<main>
+<h1>Gitty icon concepts</h1>
+<p class="lead">Four directions for the desktop app icon. All four keep the current dark tile and Gitty's green accent. The small rows show each icon at Dock/taskbar sizes on dark and light backgrounds; 16px is roughly what Windows shows in the taskbar and file lists.</p>
+<div class="grid">
+<article class="card">
+  <div class="hero"><svg viewBox="0 0 1024 1024" width="200" height="200" role="img" aria-label="Concept A"><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<path d="M300 770 C228 712 214 616 232 528 L262 280 L414 396 Q512 372 610 396 L762 280 L792 528 C810 616 796 712 724 770 Q512 870 300 770 Z" fill="none" stroke="#4cc79b" stroke-width="56" stroke-linejoin="round"/>
+<circle cx="418" cy="575" r="38" fill="#4cc79b"/><circle cx="606" cy="575" r="38" fill="#4cc79b"/>
+<path d="M486 662 L538 662 L512 690 Z" fill="#4cc79b" stroke="#4cc79b" stroke-width="16" stroke-linejoin="round"/>
+</svg></div>
+  <h2>A · Outline</h2><p>A cat head drawn as one line. The most minimal and calm; reads as a cat at any size. No git hint on its own.</p>
+  <div class="row dark"><figure><svg viewBox="0 0 1024 1024" width="64" height="64" role="img" aria-label="Concept A"><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<path d="M300 770 C228 712 214 616 232 528 L262 280 L414 396 Q512 372 610 396 L762 280 L792 528 C810 616 796 712 724 770 Q512 870 300 770 Z" fill="none" stroke="#4cc79b" stroke-width="56" stroke-linejoin="round"/>
+<circle cx="418" cy="575" r="38" fill="#4cc79b"/><circle cx="606" cy="575" r="38" fill="#4cc79b"/>
+<path d="M486 662 L538 662 L512 690 Z" fill="#4cc79b" stroke="#4cc79b" stroke-width="16" stroke-linejoin="round"/>
+</svg><figcaption>64</figcaption></figure><figure><svg viewBox="0 0 1024 1024" width="32" height="32" role="img" aria-label="Concept A"><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<path d="M300 770 C228 712 214 616 232 528 L262 280 L414 396 Q512 372 610 396 L762 280 L792 528 C810 616 796 712 724 770 Q512 870 300 770 Z" fill="none" stroke="#4cc79b" stroke-width="56" stroke-linejoin="round"/>
+<circle cx="418" cy="575" r="38" fill="#4cc79b"/><circle cx="606" cy="575" r="38" fill="#4cc79b"/>
+<path d="M486 662 L538 662 L512 690 Z" fill="#4cc79b" stroke="#4cc79b" stroke-width="16" stroke-linejoin="round"/>
+</svg><figcaption>32</figcaption></figure><figure><svg viewBox="0 0 1024 1024" width="16" height="16" role="img" aria-label="Concept A"><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<path d="M300 770 C228 712 214 616 232 528 L262 280 L414 396 Q512 372 610 396 L762 280 L792 528 C810 616 796 712 724 770 Q512 870 300 770 Z" fill="none" stroke="#4cc79b" stroke-width="56" stroke-linejoin="round"/>
+<circle cx="418" cy="575" r="38" fill="#4cc79b"/><circle cx="606" cy="575" r="38" fill="#4cc79b"/>
+<path d="M486 662 L538 662 L512 690 Z" fill="#4cc79b" stroke="#4cc79b" stroke-width="16" stroke-linejoin="round"/>
+</svg><figcaption>16</figcaption></figure></div>
+  <div class="row light"><figure><svg viewBox="0 0 1024 1024" width="64" height="64" role="img" aria-label="Concept A"><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<path d="M300 770 C228 712 214 616 232 528 L262 280 L414 396 Q512 372 610 396 L762 280 L792 528 C810 616 796 712 724 770 Q512 870 300 770 Z" fill="none" stroke="#4cc79b" stroke-width="56" stroke-linejoin="round"/>
+<circle cx="418" cy="575" r="38" fill="#4cc79b"/><circle cx="606" cy="575" r="38" fill="#4cc79b"/>
+<path d="M486 662 L538 662 L512 690 Z" fill="#4cc79b" stroke="#4cc79b" stroke-width="16" stroke-linejoin="round"/>
+</svg><figcaption>64</figcaption></figure><figure><svg viewBox="0 0 1024 1024" width="32" height="32" role="img" aria-label="Concept A"><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<path d="M300 770 C228 712 214 616 232 528 L262 280 L414 396 Q512 372 610 396 L762 280 L792 528 C810 616 796 712 724 770 Q512 870 300 770 Z" fill="none" stroke="#4cc79b" stroke-width="56" stroke-linejoin="round"/>
+<circle cx="418" cy="575" r="38" fill="#4cc79b"/><circle cx="606" cy="575" r="38" fill="#4cc79b"/>
+<path d="M486 662 L538 662 L512 690 Z" fill="#4cc79b" stroke="#4cc79b" stroke-width="16" stroke-linejoin="round"/>
+</svg><figcaption>32</figcaption></figure><figure><svg viewBox="0 0 1024 1024" width="16" height="16" role="img" aria-label="Concept A"><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<path d="M300 770 C228 712 214 616 232 528 L262 280 L414 396 Q512 372 610 396 L762 280 L792 528 C810 616 796 712 724 770 Q512 870 300 770 Z" fill="none" stroke="#4cc79b" stroke-width="56" stroke-linejoin="round"/>
+<circle cx="418" cy="575" r="38" fill="#4cc79b"/><circle cx="606" cy="575" r="38" fill="#4cc79b"/>
+<path d="M486 662 L538 662 L512 690 Z" fill="#4cc79b" stroke="#4cc79b" stroke-width="16" stroke-linejoin="round"/>
+</svg><figcaption>16</figcaption></figure></div>
+</article>
+<article class="card">
+  <div class="hero"><svg viewBox="0 0 1024 1024" width="200" height="200" role="img" aria-label="Concept B"><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<path d="M300 770 C228 712 214 616 232 528 L262 300 L414 396 Q512 372 610 396 L762 300 L792 528 C810 616 796 712 724 770 Q512 870 300 770 Z" fill="none" stroke="#4cc79b" stroke-width="56" stroke-linejoin="round"/>
+<circle cx="262" cy="290" r="70" fill="#a78bfa" stroke="#15181a" stroke-width="28"/><circle cx="762" cy="290" r="70" fill="#a78bfa" stroke="#15181a" stroke-width="28"/>
+<circle cx="418" cy="575" r="38" fill="#4cc79b"/><circle cx="606" cy="575" r="38" fill="#4cc79b"/>
+<path d="M486 662 L538 662 L512 690 Z" fill="#4cc79b" stroke="#4cc79b" stroke-width="16" stroke-linejoin="round"/>
+</svg></div>
+  <h2>B · Commit ears</h2><p>The same outline, with git commit dots at the ear tips, so the head becomes a little branch graph. Ties the name together: git + kitty.</p>
+  <div class="row dark"><figure><svg viewBox="0 0 1024 1024" width="64" height="64" role="img" aria-label="Concept B"><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<path d="M300 770 C228 712 214 616 232 528 L262 300 L414 396 Q512 372 610 396 L762 300 L792 528 C810 616 796 712 724 770 Q512 870 300 770 Z" fill="none" stroke="#4cc79b" stroke-width="56" stroke-linejoin="round"/>
+<circle cx="262" cy="290" r="70" fill="#a78bfa" stroke="#15181a" stroke-width="28"/><circle cx="762" cy="290" r="70" fill="#a78bfa" stroke="#15181a" stroke-width="28"/>
+<circle cx="418" cy="575" r="38" fill="#4cc79b"/><circle cx="606" cy="575" r="38" fill="#4cc79b"/>
+<path d="M486 662 L538 662 L512 690 Z" fill="#4cc79b" stroke="#4cc79b" stroke-width="16" stroke-linejoin="round"/>
+</svg><figcaption>64</figcaption></figure><figure><svg viewBox="0 0 1024 1024" width="32" height="32" role="img" aria-label="Concept B"><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<path d="M300 770 C228 712 214 616 232 528 L262 300 L414 396 Q512 372 610 396 L762 300 L792 528 C810 616 796 712 724 770 Q512 870 300 770 Z" fill="none" stroke="#4cc79b" stroke-width="56" stroke-linejoin="round"/>
+<circle cx="262" cy="290" r="70" fill="#a78bfa" stroke="#15181a" stroke-width="28"/><circle cx="762" cy="290" r="70" fill="#a78bfa" stroke="#15181a" stroke-width="28"/>
+<circle cx="418" cy="575" r="38" fill="#4cc79b"/><circle cx="606" cy="575" r="38" fill="#4cc79b"/>
+<path d="M486 662 L538 662 L512 690 Z" fill="#4cc79b" stroke="#4cc79b" stroke-width="16" stroke-linejoin="round"/>
+</svg><figcaption>32</figcaption></figure><figure><svg viewBox="0 0 1024 1024" width="16" height="16" role="img" aria-label="Concept B"><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<path d="M300 770 C228 712 214 616 232 528 L262 300 L414 396 Q512 372 610 396 L762 300 L792 528 C810 616 796 712 724 770 Q512 870 300 770 Z" fill="none" stroke="#4cc79b" stroke-width="56" stroke-linejoin="round"/>
+<circle cx="262" cy="290" r="70" fill="#a78bfa" stroke="#15181a" stroke-width="28"/><circle cx="762" cy="290" r="70" fill="#a78bfa" stroke="#15181a" stroke-width="28"/>
+<circle cx="418" cy="575" r="38" fill="#4cc79b"/><circle cx="606" cy="575" r="38" fill="#4cc79b"/>
+<path d="M486 662 L538 662 L512 690 Z" fill="#4cc79b" stroke="#4cc79b" stroke-width="16" stroke-linejoin="round"/>
+</svg><figcaption>16</figcaption></figure></div>
+  <div class="row light"><figure><svg viewBox="0 0 1024 1024" width="64" height="64" role="img" aria-label="Concept B"><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<path d="M300 770 C228 712 214 616 232 528 L262 300 L414 396 Q512 372 610 396 L762 300 L792 528 C810 616 796 712 724 770 Q512 870 300 770 Z" fill="none" stroke="#4cc79b" stroke-width="56" stroke-linejoin="round"/>
+<circle cx="262" cy="290" r="70" fill="#a78bfa" stroke="#15181a" stroke-width="28"/><circle cx="762" cy="290" r="70" fill="#a78bfa" stroke="#15181a" stroke-width="28"/>
+<circle cx="418" cy="575" r="38" fill="#4cc79b"/><circle cx="606" cy="575" r="38" fill="#4cc79b"/>
+<path d="M486 662 L538 662 L512 690 Z" fill="#4cc79b" stroke="#4cc79b" stroke-width="16" stroke-linejoin="round"/>
+</svg><figcaption>64</figcaption></figure><figure><svg viewBox="0 0 1024 1024" width="32" height="32" role="img" aria-label="Concept B"><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<path d="M300 770 C228 712 214 616 232 528 L262 300 L414 396 Q512 372 610 396 L762 300 L792 528 C810 616 796 712 724 770 Q512 870 300 770 Z" fill="none" stroke="#4cc79b" stroke-width="56" stroke-linejoin="round"/>
+<circle cx="262" cy="290" r="70" fill="#a78bfa" stroke="#15181a" stroke-width="28"/><circle cx="762" cy="290" r="70" fill="#a78bfa" stroke="#15181a" stroke-width="28"/>
+<circle cx="418" cy="575" r="38" fill="#4cc79b"/><circle cx="606" cy="575" r="38" fill="#4cc79b"/>
+<path d="M486 662 L538 662 L512 690 Z" fill="#4cc79b" stroke="#4cc79b" stroke-width="16" stroke-linejoin="round"/>
+</svg><figcaption>32</figcaption></figure><figure><svg viewBox="0 0 1024 1024" width="16" height="16" role="img" aria-label="Concept B"><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<path d="M300 770 C228 712 214 616 232 528 L262 300 L414 396 Q512 372 610 396 L762 300 L792 528 C810 616 796 712 724 770 Q512 870 300 770 Z" fill="none" stroke="#4cc79b" stroke-width="56" stroke-linejoin="round"/>
+<circle cx="262" cy="290" r="70" fill="#a78bfa" stroke="#15181a" stroke-width="28"/><circle cx="762" cy="290" r="70" fill="#a78bfa" stroke="#15181a" stroke-width="28"/>
+<circle cx="418" cy="575" r="38" fill="#4cc79b"/><circle cx="606" cy="575" r="38" fill="#4cc79b"/>
+<path d="M486 662 L538 662 L512 690 Z" fill="#4cc79b" stroke="#4cc79b" stroke-width="16" stroke-linejoin="round"/>
+</svg><figcaption>16</figcaption></figure></div>
+</article>
+<article class="card">
+  <div class="hero"><svg viewBox="0 0 1024 1024" width="200" height="200" role="img" aria-label="Concept C"><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<g transform="translate(-36 -24)"><path d="M420 830 C 300 830 250 740 262 640 C 272 560 310 520 330 500 C 300 470 288 430 292 390 L 300 260 L 392 330 Q 440 318 488 330 L 580 260 L 588 390 C 592 430 580 470 550 500 C 570 520 608 560 618 640 C 630 740 580 830 460 830 Z" fill="#4cc79b"/>
+<path d="M520 826 C 680 840 770 760 760 640 C 755 580 735 540 700 500 M 760 640 C 790 590 800 540 790 470" fill="none" stroke="#4cc79b" stroke-width="46" stroke-linecap="round"/>
+<circle cx="696" cy="494" r="44" fill="#4cc79b"/><circle cx="790" cy="460" r="44" fill="#4cc79b"/>
+<circle cx="392" cy="420" r="22" fill="#15181a"/><circle cx="488" cy="420" r="22" fill="#15181a"/>
+</g></svg></div>
+  <h2>C · Branch tail</h2><p>A sitting cat whose tail forks like a git branch. The most playful and story-like. Details get lost below 32px.</p>
+  <div class="row dark"><figure><svg viewBox="0 0 1024 1024" width="64" height="64" role="img" aria-label="Concept C"><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<g transform="translate(-36 -24)"><path d="M420 830 C 300 830 250 740 262 640 C 272 560 310 520 330 500 C 300 470 288 430 292 390 L 300 260 L 392 330 Q 440 318 488 330 L 580 260 L 588 390 C 592 430 580 470 550 500 C 570 520 608 560 618 640 C 630 740 580 830 460 830 Z" fill="#4cc79b"/>
+<path d="M520 826 C 680 840 770 760 760 640 C 755 580 735 540 700 500 M 760 640 C 790 590 800 540 790 470" fill="none" stroke="#4cc79b" stroke-width="46" stroke-linecap="round"/>
+<circle cx="696" cy="494" r="44" fill="#4cc79b"/><circle cx="790" cy="460" r="44" fill="#4cc79b"/>
+<circle cx="392" cy="420" r="22" fill="#15181a"/><circle cx="488" cy="420" r="22" fill="#15181a"/>
+</g></svg><figcaption>64</figcaption></figure><figure><svg viewBox="0 0 1024 1024" width="32" height="32" role="img" aria-label="Concept C"><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<g transform="translate(-36 -24)"><path d="M420 830 C 300 830 250 740 262 640 C 272 560 310 520 330 500 C 300 470 288 430 292 390 L 300 260 L 392 330 Q 440 318 488 330 L 580 260 L 588 390 C 592 430 580 470 550 500 C 570 520 608 560 618 640 C 630 740 580 830 460 830 Z" fill="#4cc79b"/>
+<path d="M520 826 C 680 840 770 760 760 640 C 755 580 735 540 700 500 M 760 640 C 790 590 800 540 790 470" fill="none" stroke="#4cc79b" stroke-width="46" stroke-linecap="round"/>
+<circle cx="696" cy="494" r="44" fill="#4cc79b"/><circle cx="790" cy="460" r="44" fill="#4cc79b"/>
+<circle cx="392" cy="420" r="22" fill="#15181a"/><circle cx="488" cy="420" r="22" fill="#15181a"/>
+</g></svg><figcaption>32</figcaption></figure><figure><svg viewBox="0 0 1024 1024" width="16" height="16" role="img" aria-label="Concept C"><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<g transform="translate(-36 -24)"><path d="M420 830 C 300 830 250 740 262 640 C 272 560 310 520 330 500 C 300 470 288 430 292 390 L 300 260 L 392 330 Q 440 318 488 330 L 580 260 L 588 390 C 592 430 580 470 550 500 C 570 520 608 560 618 640 C 630 740 580 830 460 830 Z" fill="#4cc79b"/>
+<path d="M520 826 C 680 840 770 760 760 640 C 755 580 735 540 700 500 M 760 640 C 790 590 800 540 790 470" fill="none" stroke="#4cc79b" stroke-width="46" stroke-linecap="round"/>
+<circle cx="696" cy="494" r="44" fill="#4cc79b"/><circle cx="790" cy="460" r="44" fill="#4cc79b"/>
+<circle cx="392" cy="420" r="22" fill="#15181a"/><circle cx="488" cy="420" r="22" fill="#15181a"/>
+</g></svg><figcaption>16</figcaption></figure></div>
+  <div class="row light"><figure><svg viewBox="0 0 1024 1024" width="64" height="64" role="img" aria-label="Concept C"><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<g transform="translate(-36 -24)"><path d="M420 830 C 300 830 250 740 262 640 C 272 560 310 520 330 500 C 300 470 288 430 292 390 L 300 260 L 392 330 Q 440 318 488 330 L 580 260 L 588 390 C 592 430 580 470 550 500 C 570 520 608 560 618 640 C 630 740 580 830 460 830 Z" fill="#4cc79b"/>
+<path d="M520 826 C 680 840 770 760 760 640 C 755 580 735 540 700 500 M 760 640 C 790 590 800 540 790 470" fill="none" stroke="#4cc79b" stroke-width="46" stroke-linecap="round"/>
+<circle cx="696" cy="494" r="44" fill="#4cc79b"/><circle cx="790" cy="460" r="44" fill="#4cc79b"/>
+<circle cx="392" cy="420" r="22" fill="#15181a"/><circle cx="488" cy="420" r="22" fill="#15181a"/>
+</g></svg><figcaption>64</figcaption></figure><figure><svg viewBox="0 0 1024 1024" width="32" height="32" role="img" aria-label="Concept C"><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<g transform="translate(-36 -24)"><path d="M420 830 C 300 830 250 740 262 640 C 272 560 310 520 330 500 C 300 470 288 430 292 390 L 300 260 L 392 330 Q 440 318 488 330 L 580 260 L 588 390 C 592 430 580 470 550 500 C 570 520 608 560 618 640 C 630 740 580 830 460 830 Z" fill="#4cc79b"/>
+<path d="M520 826 C 680 840 770 760 760 640 C 755 580 735 540 700 500 M 760 640 C 790 590 800 540 790 470" fill="none" stroke="#4cc79b" stroke-width="46" stroke-linecap="round"/>
+<circle cx="696" cy="494" r="44" fill="#4cc79b"/><circle cx="790" cy="460" r="44" fill="#4cc79b"/>
+<circle cx="392" cy="420" r="22" fill="#15181a"/><circle cx="488" cy="420" r="22" fill="#15181a"/>
+</g></svg><figcaption>32</figcaption></figure><figure><svg viewBox="0 0 1024 1024" width="16" height="16" role="img" aria-label="Concept C"><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<g transform="translate(-36 -24)"><path d="M420 830 C 300 830 250 740 262 640 C 272 560 310 520 330 500 C 300 470 288 430 292 390 L 300 260 L 392 330 Q 440 318 488 330 L 580 260 L 588 390 C 592 430 580 470 550 500 C 570 520 608 560 618 640 C 630 740 580 830 460 830 Z" fill="#4cc79b"/>
+<path d="M520 826 C 680 840 770 760 760 640 C 755 580 735 540 700 500 M 760 640 C 790 590 800 540 790 470" fill="none" stroke="#4cc79b" stroke-width="46" stroke-linecap="round"/>
+<circle cx="696" cy="494" r="44" fill="#4cc79b"/><circle cx="790" cy="460" r="44" fill="#4cc79b"/>
+<circle cx="392" cy="420" r="22" fill="#15181a"/><circle cx="488" cy="420" r="22" fill="#15181a"/>
+</g></svg><figcaption>16</figcaption></figure></div>
+</article>
+<article class="card">
+  <div class="hero"><svg viewBox="0 0 1024 1024" width="200" height="200" role="img" aria-label="Concept D"><defs><clipPath id="clip-d"><rect width="1024" height="1024" rx="230"/></clipPath></defs><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<g clip-path="url(#clip-d)"><path d="M180 1100 L180 560 C180 520 190 470 210 430 L250 250 L400 360 Q512 335 624 360 L774 250 L814 430 C834 470 844 520 844 560 L844 1100 Z" fill="#4cc79b"/>
+<circle cx="410" cy="600" r="46" fill="#15181a"/><circle cx="614" cy="600" r="46" fill="#15181a"/>
+<path d="M488 700 L536 700 L512 726 Z" fill="#15181a" stroke="#15181a" stroke-width="14" stroke-linejoin="round"/></g>
+</svg></div>
+  <h2>D · Peek</h2><p>A bold cat peeking over the bottom edge. The strongest at tiny sizes (taskbar, tabs); fills the tile.</p>
+  <div class="row dark"><figure><svg viewBox="0 0 1024 1024" width="64" height="64" role="img" aria-label="Concept D"><defs><clipPath id="clip-d"><rect width="1024" height="1024" rx="230"/></clipPath></defs><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<g clip-path="url(#clip-d)"><path d="M180 1100 L180 560 C180 520 190 470 210 430 L250 250 L400 360 Q512 335 624 360 L774 250 L814 430 C834 470 844 520 844 560 L844 1100 Z" fill="#4cc79b"/>
+<circle cx="410" cy="600" r="46" fill="#15181a"/><circle cx="614" cy="600" r="46" fill="#15181a"/>
+<path d="M488 700 L536 700 L512 726 Z" fill="#15181a" stroke="#15181a" stroke-width="14" stroke-linejoin="round"/></g>
+</svg><figcaption>64</figcaption></figure><figure><svg viewBox="0 0 1024 1024" width="32" height="32" role="img" aria-label="Concept D"><defs><clipPath id="clip-d"><rect width="1024" height="1024" rx="230"/></clipPath></defs><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<g clip-path="url(#clip-d)"><path d="M180 1100 L180 560 C180 520 190 470 210 430 L250 250 L400 360 Q512 335 624 360 L774 250 L814 430 C834 470 844 520 844 560 L844 1100 Z" fill="#4cc79b"/>
+<circle cx="410" cy="600" r="46" fill="#15181a"/><circle cx="614" cy="600" r="46" fill="#15181a"/>
+<path d="M488 700 L536 700 L512 726 Z" fill="#15181a" stroke="#15181a" stroke-width="14" stroke-linejoin="round"/></g>
+</svg><figcaption>32</figcaption></figure><figure><svg viewBox="0 0 1024 1024" width="16" height="16" role="img" aria-label="Concept D"><defs><clipPath id="clip-d"><rect width="1024" height="1024" rx="230"/></clipPath></defs><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<g clip-path="url(#clip-d)"><path d="M180 1100 L180 560 C180 520 190 470 210 430 L250 250 L400 360 Q512 335 624 360 L774 250 L814 430 C834 470 844 520 844 560 L844 1100 Z" fill="#4cc79b"/>
+<circle cx="410" cy="600" r="46" fill="#15181a"/><circle cx="614" cy="600" r="46" fill="#15181a"/>
+<path d="M488 700 L536 700 L512 726 Z" fill="#15181a" stroke="#15181a" stroke-width="14" stroke-linejoin="round"/></g>
+</svg><figcaption>16</figcaption></figure></div>
+  <div class="row light"><figure><svg viewBox="0 0 1024 1024" width="64" height="64" role="img" aria-label="Concept D"><defs><clipPath id="clip-d"><rect width="1024" height="1024" rx="230"/></clipPath></defs><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<g clip-path="url(#clip-d)"><path d="M180 1100 L180 560 C180 520 190 470 210 430 L250 250 L400 360 Q512 335 624 360 L774 250 L814 430 C834 470 844 520 844 560 L844 1100 Z" fill="#4cc79b"/>
+<circle cx="410" cy="600" r="46" fill="#15181a"/><circle cx="614" cy="600" r="46" fill="#15181a"/>
+<path d="M488 700 L536 700 L512 726 Z" fill="#15181a" stroke="#15181a" stroke-width="14" stroke-linejoin="round"/></g>
+</svg><figcaption>64</figcaption></figure><figure><svg viewBox="0 0 1024 1024" width="32" height="32" role="img" aria-label="Concept D"><defs><clipPath id="clip-d"><rect width="1024" height="1024" rx="230"/></clipPath></defs><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<g clip-path="url(#clip-d)"><path d="M180 1100 L180 560 C180 520 190 470 210 430 L250 250 L400 360 Q512 335 624 360 L774 250 L814 430 C834 470 844 520 844 560 L844 1100 Z" fill="#4cc79b"/>
+<circle cx="410" cy="600" r="46" fill="#15181a"/><circle cx="614" cy="600" r="46" fill="#15181a"/>
+<path d="M488 700 L536 700 L512 726 Z" fill="#15181a" stroke="#15181a" stroke-width="14" stroke-linejoin="round"/></g>
+</svg><figcaption>32</figcaption></figure><figure><svg viewBox="0 0 1024 1024" width="16" height="16" role="img" aria-label="Concept D"><defs><clipPath id="clip-d"><rect width="1024" height="1024" rx="230"/></clipPath></defs><rect width="1024" height="1024" rx="230" fill="#15181a"/>
+<g clip-path="url(#clip-d)"><path d="M180 1100 L180 560 C180 520 190 470 210 430 L250 250 L400 360 Q512 335 624 360 L774 250 L814 430 C834 470 844 520 844 560 L844 1100 Z" fill="#4cc79b"/>
+<circle cx="410" cy="600" r="46" fill="#15181a"/><circle cx="614" cy="600" r="46" fill="#15181a"/>
+<path d="M488 700 L536 700 L512 726 Z" fill="#15181a" stroke="#15181a" stroke-width="14" stroke-linejoin="round"/></g>
+</svg><figcaption>16</figcaption></figure></div>
+</article>
+</div>
+<ul class="notes">
+<li>Pick one (or a mix, e.g. "A's shape with D's fill") and I'll finalise it and generate every size: .icns, .ico and the PNGs.</li>
+<li>Colours can change too: the purple in B matches the branch colour in the current icon.</li>
+<li>All of these are new drawings; none copies the cat icon of the kitty terminal.</li>
+</ul>
+</main>
+</body>
+</html>
