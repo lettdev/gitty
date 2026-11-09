@@ -266,6 +266,7 @@ export const api = {
   tags: () => invoke<[string, string, number][]>("tags"),
   searchLog: (query: string) => invoke<Commit[]>("search_log", { query }),
   initRepo: (path: string) => invoke<RepoInfo>("init_repo", { path }),
+  initWarning: (path: string) => invoke<string | null>("init_warning", { path }),
   operation: (op: "continue" | "abort" | "skip") => invoke<OpResult>("operation", { op }),
 };
 
@@ -299,6 +300,21 @@ export function splitPath(path: string): [string, string] {
   return i < 0 ? [trimmed + slash, ""] : [trimmed.slice(i + 1) + slash, trimmed.slice(0, i)];
 }
 
+/** `open_repo` rejects with this when the folder exists but has no repository yet. */
+export interface NotARepo {
+  kind: "not_a_repo";
+  path: string;
+  name: string;
+  warning: string | null;
+}
+
+export function isNotARepo(e: unknown): e is NotARepo {
+  return typeof e === "object" && e !== null && (e as { kind?: string }).kind === "not_a_repo";
+}
+
 export function errorText(e: unknown): string {
-  return typeof e === "string" ? e : e instanceof Error ? e.message : JSON.stringify(e);
+  if (typeof e === "string") return e;
+  if (e instanceof Error) return e.message;
+  if (typeof e === "object" && e !== null && typeof (e as { message?: unknown }).message === "string") return (e as { message: string }).message;
+  return JSON.stringify(e);
 }

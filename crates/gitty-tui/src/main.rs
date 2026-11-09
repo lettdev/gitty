@@ -81,10 +81,10 @@ fn main() -> Result<()> {
     };
     let repo = match Repo::discover(&start) {
         Ok(r) => r,
-        Err(Error::NotARepo(_)) => {
-            eprintln!("gitty: {} is not inside a git repository.\nRun `git init` there first, or pass a path: gitty ~/code/project", start.display());
-            std::process::exit(1);
-        }
+        Err(Error::NotARepo(_)) => match offer_init(&start) {
+            Some(r) => r,
+            None => std::process::exit(1),
+        },
         Err(Error::GitNotFound) => {
             eprintln!("gitty: git was not found. Install it from https://git-scm.com and try again.");
             std::process::exit(1);
@@ -119,6 +119,46 @@ fn main() -> Result<()> {
     result
 }
 
+/// `start` is a plain folder: offer to `git init` it (when we can ask), and
+/// return the new repository on yes.
+fn offer_init(start: &Path) -> Option<Repo> {
+    use std::io::IsTerminal;
+    let shown = start.canonicalize().unwrap_or_else(|_| start.to_path_buf());
+    eprintln!("gitty: {} isn't a git repository yet.", shown.display());
+    if !io::stdin().is_terminal() || !io::stderr().is_terminal() {
+        eprintln!("Run `git init` there first, or pass a path: gitty ~/code/project");
+        return None;
+    }
+    let warning = gitty_core::workspace::init_warning(start);
+    if let Some(w) = &warning {
+        eprintln!("\nCareful: {w}");
+    }
+    // default to no when there's a warning, yes otherwise
+    let hint = if warning.is_some() { "[y/N]" } else { "[Y/n]" };
+    eprint!("\nInitialize a repository here (adds a .git folder, first branch main)? {hint} ");
+    let _ = io::stderr().flush();
+    let mut answer = String::new();
+    if io::stdin().read_line(&mut answer).is_err() {
+        return None;
+    }
+    let yes = match answer.trim().to_lowercase().as_str() {
+        "y" | "yes" => true,
+        "" => warning.is_none(),
+        _ => false,
+    };
+    if !yes {
+        eprintln!("Nothing changed. Open a repository with: gitty ~/code/project");
+        return None;
+    }
+    match gitty_core::workspace::init_repo(start).and_then(|_| Repo::discover(start)) {
+        Ok(r) => Some(r),
+        Err(e) => {
+            eprintln!("gitty: couldn't create the repository: {e}");
+            None
+        }
+    }
+}
+
 fn run(terminal: &mut DefaultTerminal, repo: Repo, cfg: config::Config, cfg_error: Option<String>) -> Result<()> {
     let mouse = cfg.mouse;
     let mut app = app::App::new(repo, cfg.clone(), cfg_error);
@@ -131,6 +171,10 @@ fn run(terminal: &mut DefaultTerminal, repo: Repo, cfg: config::Config, cfg_erro
                     app = app::App::new(next, cfg.clone(), None);
                     _watcher = watcher::start(&app.repo, app.sender());
                 }
+                Err(Error::NotARepo(_)) => app.after_suspend(Err(format!(
+                    "{} isn't a git repository any more — run gitty there to set one up.",
+                    path.display()
+                ))),
                 Err(e) => app.after_suspend(Err(format!("Can't open {}: {e}", path.display()))),
             }
         }

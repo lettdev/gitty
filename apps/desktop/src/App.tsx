@@ -4,7 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { CloneDialog, IgnoreDialog, SettingsDialog, loadSettings, saveSettings, type Settings } from "./components/Dialogs";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { Branch, OpResult, RepoInfo, RepoSummary, StatusDto } from "./api";
-import { api, errorText, relativeTime } from "./api";
+import { api, errorText, isNotARepo, relativeTime } from "./api";
 import { Changes, type Ctx } from "./components/Changes";
 import { History } from "./components/History";
 import { Insight } from "./components/Insight";
@@ -59,6 +59,8 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [ignore, setIgnore] = useState<{ check?: string } | null>(null);
   const [cloning, setCloning] = useState(false);
+  // folder waiting on "start tracking with git?"; `fresh` = picked via New repository
+  const [initAsk, setInitAsk] = useState<{ path: string; name: string; warning: string | null; fresh: boolean } | null>(null);
 
   // apply the theme to the page and to the native window frame
   useEffect(() => {
@@ -170,6 +172,17 @@ export default function App() {
       setRepo(await api.openRepo(path));
       setView("changes");
     } catch (e) {
+      if (isNotARepo(e)) setInitAsk({ path: e.path, name: e.name, warning: e.warning, fresh: false });
+      else notify(errorText(e), true);
+    }
+  };
+  const initHere = async (path: string, name: string) => {
+    setInitAsk(null);
+    try {
+      setRepo(await api.initRepo(path));
+      setView("changes");
+      notify(`${name} is now a git repository`);
+    } catch (e) {
       notify(errorText(e), true);
     }
   };
@@ -201,15 +214,12 @@ export default function App() {
     if (name?.trim()) run(() => api.createBranch(name.trim(), null));
   };
   const newRepo = async () => {
-    const dir = await openDialog({ directory: true, multiple: false, title: "Choose an empty folder for the new repository" });
+    const dir = await openDialog({ directory: true, multiple: false, title: "Choose a folder for the new repository" });
     if (typeof dir !== "string") return;
-    try {
-      setRepo(await api.initRepo(dir));
-      setView("changes");
-      notify("Created a new repository");
-    } catch (e) {
-      notify(errorText(e), true);
-    }
+    const name = dir.split(/[\\/]/).filter(Boolean).pop() ?? dir;
+    const warning = await api.initWarning(dir).catch(() => null);
+    if (warning) setInitAsk({ path: dir, name, warning, fresh: true });
+    else initHere(dir, name);
   };
   const stash = async () => {
     const msg = await promptFn({ title: "Stash all changes (new files included)", value: "", body: "Optional message.", confirm: "Stash" });
@@ -287,6 +297,14 @@ export default function App() {
             setView("changes");
             notify(`Cloned ${r.name}`);
           }}
+        />
+      )}
+      {initAsk && (
+        <InitDialog
+          ask={initAsk}
+          onInit={() => initHere(initAsk.path, initAsk.name)}
+          onBrowse={() => { setInitAsk(null); openFolder(); }}
+          onClose={() => setInitAsk(null)}
         />
       )}
     </>
@@ -398,6 +416,41 @@ export default function App() {
       {ignore && <IgnoreDialog ctx={ctx} checkPath={ignore.check} onClose={() => setIgnore(null)} />}
       {prompt && <PromptDialog p={prompt} onDone={(v) => { prompt.resolve(v); setPrompt(null); }} />}
       {toast && <div className={`toast ${toast.err ? "err" : ""}`}>{toast.text}</div>}
+    </div>
+  );
+}
+
+function InitDialog({ ask, onInit, onBrowse, onClose }: {
+  ask: { path: string; name: string; warning: string | null; fresh: boolean };
+  onInit: () => void;
+  onBrowse: () => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Start a repository">
+        <div className="body2">
+          <h3>{ask.fresh ? `Create a repository in “${ask.name}”?` : `“${ask.name}” isn't a git repository yet`}</h3>
+          <p>
+            {ask.fresh ? "" : "Gitty can start tracking this folder with git. "}
+            Your files stay exactly as they are — this only adds a hidden <code>.git</code> folder, with <b>main</b> as the first branch.
+          </p>
+          <p className="mono" style={{ fontSize: 12 }}>{ask.path}</p>
+          {ask.warning && <p style={{ color: "var(--orange)" }}>{ask.warning}</p>}
+        </div>
+        <div className="actions">
+          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn" onClick={onBrowse}>Choose another folder…</button>
+          <button className={`btn ${ask.warning ? "" : "primary"}`} autoFocus={!ask.warning} onClick={onInit}>
+            {ask.warning ? "Create it anyway" : "Initialize repository"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

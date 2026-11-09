@@ -53,6 +53,7 @@ fn main() {
             commands::tags,
             commands::search_log,
             commands::init_repo,
+            commands::init_warning,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Gitty");

@@ -81,7 +81,10 @@ fn remember(app: &AppHandle, root: &Path) {
 }
 
 fn open(app: &AppHandle, state: &State<'_, AppState>, path: &Path) -> Res<RepoInfo> {
-    let repo = Repo::discover(path).map_err(err)?;
+    adopt(app, state, Repo::discover(path).map_err(err)?)
+}
+
+fn adopt(app: &AppHandle, state: &State<'_, AppState>, repo: Repo) -> Res<RepoInfo> {
     remember(app, repo.root());
     let info = RepoInfo { name: repo.name().to_string(), root: repo.root().display().to_string() };
     *state.repo.lock().map_err(err)? = Some(repo);
@@ -113,9 +116,33 @@ pub fn start_view() -> Option<String> {
     std::env::var("GITTY_VIEW").ok()
 }
 
+/// Why a folder couldn't be opened. `NotARepo` lets the UI offer `git init`
+/// instead of showing git's error.
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum OpenError {
+    NotARepo { path: String, name: String, warning: Option<String> },
+    Other { message: String },
+}
+
 #[tauri::command]
-pub async fn open_repo(app: AppHandle, state: State<'_, AppState>, path: String) -> Res<RepoInfo> {
-    open(&app, &state, Path::new(&path))
+pub async fn open_repo(app: AppHandle, state: State<'_, AppState>, path: String) -> Result<RepoInfo, OpenError> {
+    let p = PathBuf::from(&path);
+    match Repo::discover(&p) {
+        Ok(repo) => adopt(&app, &state, repo).map_err(|message| OpenError::Other { message }),
+        Err(gitty_core::Error::NotARepo(_)) if p.is_dir() => Err(OpenError::NotARepo {
+            name: p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.clone()),
+            warning: workspace::init_warning(&p),
+            path,
+        }),
+        Err(e) => Err(OpenError::Other { message: e.to_string() }),
+    }
+}
+
+/// A reason to think twice before `git init` in `path`, if any.
+#[tauri::command]
+pub async fn init_warning(path: String) -> Option<String> {
+    workspace::init_warning(Path::new(&path))
 }
 
 /// Recent repositories plus their siblings, summarized.

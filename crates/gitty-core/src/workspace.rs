@@ -50,6 +50,29 @@ pub fn init_repo(path: &Path) -> crate::Result<PathBuf> {
     Ok(path.to_path_buf())
 }
 
+/// A reason to think twice before running `git init` in `path`: the drive
+/// root, the home folder, or a folder already inside another repository.
+pub fn init_warning(path: &Path) -> Option<String> {
+    let p = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    if p.parent().is_none() {
+        return Some("This is the top of the drive. Tracking it would put every file on the disk under git.".into());
+    }
+    let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from);
+    if home.and_then(|h| h.canonicalize().ok()).is_some_and(|h| h == p) {
+        return Some("This is your home folder. Tracking it would put all your personal files under git — usually you want a project folder inside it.".into());
+    }
+    if let Ok(outer) = crate::Repo::discover(&p) {
+        let outer_root = outer.root().canonicalize().unwrap_or_else(|_| outer.root().to_path_buf());
+        if outer_root != p {
+            return Some(format!(
+                "This folder is already inside the repository at {}. A new repository here would be nested in it.",
+                outer.root().display()
+            ));
+        }
+    }
+    None
+}
+
 /// Repositories under `roots`, at most `max_depth` folders deep.
 /// Does not descend into a repository once found.
 pub fn find_repos(roots: &[PathBuf], max_depth: usize) -> Vec<PathBuf> {
@@ -150,6 +173,19 @@ mod tests {
         init_repo(&p).unwrap();
         assert!(p.join(".git").exists());
         assert!(init_repo(&p).is_err());
+    }
+
+    #[test]
+    fn init_warnings() {
+        let d = tempfile::tempdir().unwrap();
+        let plain = d.path().join("plain");
+        std::fs::create_dir_all(&plain).unwrap();
+        assert_eq!(init_warning(&plain), None);
+        assert!(init_warning(Path::new("/")).is_some());
+        init_repo(&plain).unwrap();
+        let inner = plain.join("sub");
+        std::fs::create_dir_all(&inner).unwrap();
+        assert!(init_warning(&inner).unwrap().contains("inside the repository"));
     }
 
     #[test]

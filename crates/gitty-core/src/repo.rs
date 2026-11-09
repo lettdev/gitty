@@ -37,6 +37,10 @@ pub struct Repo {
 impl Repo {
     /// Find the repository containing `start`.
     pub fn discover(start: &Path) -> Result<Self> {
+        // git can't start in a missing folder, which would look like "git not found"
+        if !start.exists() {
+            return Err(Error::Msg(format!("{} doesn't exist.", start.display())));
+        }
         let probe = Git::new(start);
         let out = match probe.run_text(&["rev-parse", "--show-toplevel", "--absolute-git-dir"]) {
             Ok(o) => o,
