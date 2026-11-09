@@ -1,5 +1,7 @@
 # Template: replace VERSION, RELEASE_DATE (YYYY-MM-DD) and SHA256_WINDOWS_X64
 # (from gitty-vVERSION-windows-x64.zip.sha256 on the release).
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.28.0.schema.json
+
 PackageIdentifier: lettdev.Gitty
 PackageVersion: VERSION
 InstallerType: zip
@@ -16,4 +18,4 @@ Installers:
     InstallerUrl: https://github.com/lettdev/gitty/releases/download/vVERSION/gitty-vVERSION-windows-x64.zip
     InstallerSha256: SHA256_WINDOWS_X64
 ManifestType: installer
-ManifestVersion: 1.6.0
+ManifestVersion: 1.28.0

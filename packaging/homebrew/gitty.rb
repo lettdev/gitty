@@ -4,14 +4,12 @@
 class Gitty < Formula
   desc "Friendly git client for the terminal"
   homepage "https://github.com/lettdev/gitty"
+  url "https://github.com/lettdev/gitty/releases/download/vVERSION/gitty-vVERSION-macos-arm64.tar.gz"
+  sha256 "SHA256_MACOS_ARM64"
   license "MIT"
-  version "VERSION"
 
   depends_on arch: :arm64
   depends_on :macos
-
-  url "https://github.com/lettdev/gitty/releases/download/vVERSION/gitty-vVERSION-macos-arm64.tar.gz"
-  sha256 "SHA256_MACOS_ARM64"
 
   def install
     bin.install "gitty"

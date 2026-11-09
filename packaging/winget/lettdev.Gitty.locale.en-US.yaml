@@ -1,4 +1,6 @@
 # Template: replace VERSION before submitting.
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.28.0.schema.json
+
 PackageIdentifier: lettdev.Gitty
 PackageVersion: VERSION
 PackageLocale: en-US
@@ -19,4 +21,4 @@ Tags:
   - version-control
 ReleaseNotesUrl: https://github.com/lettdev/gitty/releases/tag/vVERSION
 ManifestType: defaultLocale
-ManifestVersion: 1.6.0
+ManifestVersion: 1.28.0
