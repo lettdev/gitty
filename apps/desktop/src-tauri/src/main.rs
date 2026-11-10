@@ -54,6 +54,8 @@ fn main() {
             commands::search_log,
             commands::init_repo,
             commands::init_warning,
+            commands::trust_folder,
+            commands::folder_preview,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Gitty");

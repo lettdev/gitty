@@ -282,7 +282,7 @@ fn build_tree(files: &[(String, u64)]) -> SizeNode {
     convert(String::new(), String::new(), root)
 }
 
-fn ext_pattern(path: &str) -> Option<String> {
+pub(crate) fn ext_pattern(path: &str) -> Option<String> {
     let name = path.rsplit('/').next()?;
     let (_, ext) = name.rsplit_once('.')?;
     if ext.is_empty() || ext.len() > 10 {

@@ -9,6 +9,10 @@ pub enum Error {
     GitNotFound,
     #[error("not a git repository: {0}")]
     NotARepo(String),
+    /// Git refuses the repository because the folder belongs to another
+    /// account ("dubious ownership"). `path` is what to pass to `trust_folder`.
+    #[error("git doesn't trust {path}: the folder belongs to a different user account")]
+    UntrustedRepo { path: String },
     #[error("`{command}` failed:\n{stderr}")]
     Command { command: String, stderr: String },
     #[error("{0}")]

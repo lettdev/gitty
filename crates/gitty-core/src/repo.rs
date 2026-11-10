@@ -34,6 +34,36 @@ pub struct Repo {
     name: String,
 }
 
+/// Turn git's refusal to find a repository into the reason behind it: no
+/// repository at all, an untrusted one, or something else (shown as is).
+fn classify_discover_error(command: String, stderr: String) -> Error {
+    if stderr.contains("dubious ownership") {
+        // git prints the exact exception to add; fall back to the path it names
+        let path = stderr
+            .lines()
+            .find_map(|l| l.trim().strip_prefix("git config --global --add safe.directory "))
+            .map(|p| p.trim().trim_matches('\'').to_string())
+            .or_else(|| stderr.split_once("repository at '").and_then(|(_, rest)| rest.split_once('\'')).map(|(p, _)| p.to_string()))
+            .unwrap_or_default();
+        return Error::UntrustedRepo { path };
+    }
+    if stderr.contains("not a git repository") {
+        return Error::NotARepo(stderr);
+    }
+    Error::Command { command, stderr }
+}
+
+/// Tell git to trust a folder owned by another account
+/// (`git config --global --add safe.directory <path>`), for that folder only.
+pub fn trust_folder(path: &str) -> Result<()> {
+    if path.trim().is_empty() || path.trim() == "*" {
+        return Err(Error::Msg("Refusing to trust every folder; pick one repository.".into()));
+    }
+    let home = std::env::temp_dir();
+    Git::new(home).run(&["config", "--global", "--add", "safe.directory", path])?;
+    Ok(())
+}
+
 impl Repo {
     /// Find the repository containing `start`.
     pub fn discover(start: &Path) -> Result<Self> {
@@ -44,7 +74,7 @@ impl Repo {
         let probe = Git::new(start);
         let out = match probe.run_text(&["rev-parse", "--show-toplevel", "--absolute-git-dir"]) {
             Ok(o) => o,
-            Err(Error::Command { stderr, .. }) => return Err(Error::NotARepo(stderr)),
+            Err(Error::Command { stderr, command }) => return Err(classify_discover_error(command, stderr)),
             Err(e) => return Err(e),
         };
         let mut lines = out.lines().map(str::trim);

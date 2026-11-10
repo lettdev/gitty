@@ -265,8 +265,11 @@ export const api = {
   cloneRepo: (url: string, parent: string, name: string) => invoke<RepoInfo>("clone_repo", { url, parent, name }),
   tags: () => invoke<[string, string, number][]>("tags"),
   searchLog: (query: string) => invoke<Commit[]>("search_log", { query }),
-  initRepo: (path: string) => invoke<RepoInfo>("init_repo", { path }),
+  initRepo: (path: string, ignoreRules: string[] = [], lfsPatterns: string[] = []) =>
+    invoke<RepoInfo>("init_repo", { path, ignoreRules, lfsPatterns }),
+  folderPreview: (path: string) => invoke<FolderPreview>("folder_preview", { path }),
   initWarning: (path: string) => invoke<string | null>("init_warning", { path }),
+  trustFolder: (path: string) => invoke<void>("trust_folder", { path }),
   operation: (op: "continue" | "abort" | "skip") => invoke<OpResult>("operation", { op }),
 };
 
@@ -306,6 +309,34 @@ export interface NotARepo {
   path: string;
   name: string;
   warning: string | null;
+}
+
+export interface FolderPreview {
+  root: string;
+  kind: string | null;
+  files: number;
+  bytes: number;
+  kept_files: number;
+  kept_bytes: number;
+  top: { name: string; is_dir: boolean; files: number; bytes: number; ignored_by: string | null }[];
+  big: [string, number][];
+  ignore_rules: string[];
+  lfs_patterns: string[];
+  lfs_available: boolean;
+  has_gitignore: boolean;
+  truncated: boolean;
+}
+
+/** `open_repo` rejects with this when git won't open a repository owned by another account. */
+export interface Untrusted {
+  kind: "untrusted";
+  path: string;
+  name: string;
+  trust_path: string;
+}
+
+export function isUntrusted(e: unknown): e is Untrusted {
+  return typeof e === "object" && e !== null && (e as { kind?: string }).kind === "untrusted";
 }
 
 export function isNotARepo(e: unknown): e is NotARepo {

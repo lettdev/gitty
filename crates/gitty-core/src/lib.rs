@@ -15,6 +15,7 @@ pub mod insight;
 pub mod log;
 pub mod oplog;
 pub mod ops;
+pub mod preview;
 pub mod project;
 pub mod rebase;
 pub mod repo;

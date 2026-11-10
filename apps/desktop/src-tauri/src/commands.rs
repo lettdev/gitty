@@ -122,6 +122,9 @@ pub fn start_view() -> Option<String> {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum OpenError {
     NotARepo { path: String, name: String, warning: Option<String> },
+    /// The folder is a repository, but git won't open it because it belongs
+    /// to another account; `trust_path` is the folder to trust.
+    Untrusted { path: String, name: String, trust_path: String },
     Other { message: String },
 }
 
@@ -135,8 +138,19 @@ pub async fn open_repo(app: AppHandle, state: State<'_, AppState>, path: String)
             warning: workspace::init_warning(&p),
             path,
         }),
+        Err(gitty_core::Error::UntrustedRepo { path: trust_path }) => Err(OpenError::Untrusted {
+            name: p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.clone()),
+            trust_path,
+            path,
+        }),
         Err(e) => Err(OpenError::Other { message: e.to_string() }),
     }
+}
+
+/// Add a `safe.directory` exception for one folder, after the user agreed.
+#[tauri::command]
+pub async fn trust_folder(path: String) -> Res<()> {
+    blocking(move || gitty_core::repo::trust_folder(&path).map_err(err)).await
 }
 
 /// A reason to think twice before `git init` in `path`, if any.
@@ -823,7 +837,20 @@ pub async fn search_log(state: State<'_, AppState>, query: String) -> Res<Vec<Co
 }
 
 #[tauri::command]
-pub async fn init_repo(app: AppHandle, state: State<'_, AppState>, path: String) -> Res<RepoInfo> {
-    let target = blocking(move || workspace::init_repo(Path::new(&path)).map_err(err)).await?;
+pub async fn init_repo(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    path: String,
+    ignore_rules: Option<Vec<String>>,
+    lfs_patterns: Option<Vec<String>>,
+) -> Res<RepoInfo> {
+    let opts = gitty_core::preview::InitOptions { ignore_rules: ignore_rules.unwrap_or_default(), lfs_patterns: lfs_patterns.unwrap_or_default() };
+    let target = blocking(move || gitty_core::preview::init_with(Path::new(&path), &opts).map_err(err)).await?;
     open(&app, &state, &target)
+}
+
+/// What a plain folder holds, to decide whether (and how) to set git up in it.
+#[tauri::command]
+pub async fn folder_preview(path: String) -> Res<gitty_core::preview::FolderPreview> {
+    blocking(move || Ok(gitty_core::preview::preview(Path::new(&path)))).await
 }

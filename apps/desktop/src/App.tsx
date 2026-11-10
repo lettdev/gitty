@@ -3,8 +3,8 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { CloneDialog, IgnoreDialog, SettingsDialog, loadSettings, saveSettings, type Settings } from "./components/Dialogs";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import type { Branch, OpResult, RepoInfo, RepoSummary, StatusDto } from "./api";
-import { api, errorText, isNotARepo, relativeTime } from "./api";
+import type { Branch, FolderPreview, OpResult, RepoInfo, RepoSummary, StatusDto } from "./api";
+import { api, errorText, humanSize, isNotARepo, isUntrusted, relativeTime } from "./api";
 import { Changes, type Ctx } from "./components/Changes";
 import { History } from "./components/History";
 import { Insight } from "./components/Insight";
@@ -61,6 +61,8 @@ export default function App() {
   const [cloning, setCloning] = useState(false);
   // folder waiting on "start tracking with git?"; `fresh` = picked via New repository
   const [initAsk, setInitAsk] = useState<{ path: string; name: string; warning: string | null; fresh: boolean } | null>(null);
+  // a repository git won't open because the folder belongs to another account
+  const [trustAsk, setTrustAsk] = useState<{ path: string; name: string; trustPath: string } | null>(null);
 
   // apply the theme to the page and to the native window frame
   useEffect(() => {
@@ -173,13 +175,23 @@ export default function App() {
       setView("changes");
     } catch (e) {
       if (isNotARepo(e)) setInitAsk({ path: e.path, name: e.name, warning: e.warning, fresh: false });
+      else if (isUntrusted(e)) setTrustAsk({ path: e.path, name: e.name, trustPath: e.trust_path });
       else notify(errorText(e), true);
     }
   };
-  const initHere = async (path: string, name: string) => {
+  const trustAndOpen = async (path: string, trustPath: string) => {
+    setTrustAsk(null);
+    try {
+      await api.trustFolder(trustPath);
+      await openRepo(path);
+    } catch (e) {
+      notify(errorText(e), true);
+    }
+  };
+  const initHere = async (path: string, name: string, ignoreRules: string[] = [], lfsPatterns: string[] = []) => {
     setInitAsk(null);
     try {
-      setRepo(await api.initRepo(path));
+      setRepo(await api.initRepo(path, ignoreRules, lfsPatterns));
       setView("changes");
       notify(`${name} is now a git repository`);
     } catch (e) {
@@ -218,8 +230,8 @@ export default function App() {
     if (typeof dir !== "string") return;
     const name = dir.split(/[\\/]/).filter(Boolean).pop() ?? dir;
     const warning = await api.initWarning(dir).catch(() => null);
-    if (warning) setInitAsk({ path: dir, name, warning, fresh: true });
-    else initHere(dir, name);
+    // always ask: the dialog shows what's in the folder and the rules it would add
+    setInitAsk({ path: dir, name, warning, fresh: true });
   };
   const stash = async () => {
     const msg = await promptFn({ title: "Stash all changes (new files included)", value: "", body: "Optional message.", confirm: "Stash" });
@@ -299,10 +311,17 @@ export default function App() {
           }}
         />
       )}
+      {trustAsk && (
+        <TrustDialog
+          ask={trustAsk}
+          onTrust={() => trustAndOpen(trustAsk.path, trustAsk.trustPath)}
+          onClose={() => setTrustAsk(null)}
+        />
+      )}
       {initAsk && (
         <InitDialog
           ask={initAsk}
-          onInit={() => initHere(initAsk.path, initAsk.name)}
+          onInit={(rules, lfs) => initHere(initAsk.path, initAsk.name, rules, lfs)}
           onBrowse={() => { setInitAsk(null); openFolder(); }}
           onClose={() => setInitAsk(null)}
         />
@@ -420,10 +439,9 @@ export default function App() {
   );
 }
 
-function InitDialog({ ask, onInit, onBrowse, onClose }: {
-  ask: { path: string; name: string; warning: string | null; fresh: boolean };
-  onInit: () => void;
-  onBrowse: () => void;
+function TrustDialog({ ask, onTrust, onClose }: {
+  ask: { path: string; name: string; trustPath: string };
+  onTrust: () => void;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -433,20 +451,112 @@ function InitDialog({ ask, onInit, onBrowse, onClose }: {
   }, [onClose]);
   return (
     <div className="overlay" onClick={onClose}>
+      <div className="dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Trust this repository">
+        <div className="body2">
+          <h3>Git doesn't trust “{ask.name}” yet</h3>
+          <p>
+            This is a git repository, but the folder belongs to a different user account (common for external drives, folders created as
+            Administrator, or repositories copied from another computer). Git won't work in it until you trust it.
+          </p>
+          <p>Only trust folders you know. Trusting lets this repository's settings and hooks run under your account.</p>
+          <p className="mono" style={{ fontSize: 12 }}>git config --global --add safe.directory {ask.trustPath}</p>
+        </div>
+        <div className="actions">
+          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn primary" onClick={onTrust}>Trust this folder</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InitDialog({ ask, onInit, onBrowse, onClose }: {
+  ask: { path: string; name: string; warning: string | null; fresh: boolean };
+  onInit: (ignoreRules: string[], lfsPatterns: string[]) => void;
+  onBrowse: () => void;
+  onClose: () => void;
+}) {
+  const [preview, setPreview] = useState<FolderPreview | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [useRules, setUseRules] = useState(true);
+  const [useLfs, setUseLfs] = useState(true);
+  useEffect(() => {
+    let live = true;
+    api.folderPreview(ask.path).then((p) => live && setPreview(p)).catch(() => live && setFailed(true));
+    return () => {
+      live = false;
+    };
+  }, [ask.path]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  const canLfs = !!preview && preview.lfs_available && preview.lfs_patterns.length > 0;
+  const atLeast = preview?.truncated ? "at least " : "";
+  const n = (x: number) => x.toLocaleString();
+  const go = () => onInit(preview && useRules ? preview.ignore_rules : [], preview && canLfs && useLfs ? preview.lfs_patterns : []);
+  return (
+    <div className="overlay" onClick={onClose}>
       <div className="dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Start a repository">
         <div className="body2">
           <h3>{ask.fresh ? `Create a repository in “${ask.name}”?` : `“${ask.name}” isn't a git repository yet`}</h3>
-          <p>
-            {ask.fresh ? "" : "Gitty can start tracking this folder with git. "}
-            Your files stay exactly as they are — this only adds a hidden <code>.git</code> folder, with <b>main</b> as the first branch.
-          </p>
           <p className="mono" style={{ fontSize: 12 }}>{ask.path}</p>
           {ask.warning && <p style={{ color: "var(--orange)" }}>{ask.warning}</p>}
+          {!preview && !failed && <p><span className="spin" /> Looking through the folder…</p>}
+          {preview && preview.files === 0 && <p>Empty folder.</p>}
+          {preview && preview.files > 0 && (
+            <div className="preview">
+              <p>
+                <b>{preview.kind ? `${preview.kind} project` : "No project type recognised"}</b> · {atLeast}
+                {n(preview.files)} files · {humanSize(preview.bytes)}
+              </p>
+              <table className="ptable">
+                <tbody>
+                  {preview.top.slice(0, 6).map((e) => (
+                    <tr key={e.name} className={e.ignored_by ? "muted" : ""}>
+                      <td className="mono">{e.name}{e.is_dir ? "/" : ""}</td>
+                      <td className="num">{humanSize(e.bytes)}</td>
+                      <td>{e.ignored_by ? `left out (${e.ignored_by})` : ""}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {preview.top.length > 6 && <p className="muted">… {preview.top.length - 6} more</p>}
+              {preview.kept_bytes !== preview.bytes && (
+                <p>With the recommended rules, git would track {atLeast}{humanSize(preview.kept_bytes)} in {n(preview.kept_files)} files.</p>
+              )}
+              {preview.big.length > 0 && (
+                <p style={{ color: "var(--orange)" }}>
+                  {preview.big.length} large files ({humanSize(preview.big.reduce((s, b) => s + b[1], 0))}) are better kept in Git LFS:{" "}
+                  {preview.lfs_patterns.join(" ")}
+                  {!preview.lfs_available && " — Git LFS isn't installed (git-lfs.com)."}
+                </p>
+              )}
+            </div>
+          )}
+          {preview && (preview.ignore_rules.length > 0 || canLfs) && (
+            <div className="checks">
+              {preview.ignore_rules.length > 0 && (
+                <label>
+                  <input type="checkbox" checked={useRules} onChange={(e) => setUseRules(e.target.checked)} /> Add {preview.kind ?? ""} .gitignore rules{" "}
+                  <span className="muted mono">({preview.ignore_rules.slice(0, 4).join(" ")}{preview.ignore_rules.length > 4 ? " …" : ""})</span>
+                </label>
+              )}
+              {canLfs && (
+                <label>
+                  <input type="checkbox" checked={useLfs} onChange={(e) => setUseLfs(e.target.checked)} /> Track{" "}
+                  <span className="mono">{preview.lfs_patterns.slice(0, 5).join(" ")}</span> with Git LFS
+                </label>
+              )}
+            </div>
+          )}
+          <p className="muted">Your files stay as they are; nothing is staged or committed. You'll see everything in Changes.</p>
         </div>
         <div className="actions">
           <button className="btn" onClick={onClose}>Cancel</button>
           <button className="btn" onClick={onBrowse}>Choose another folder…</button>
-          <button className={`btn ${ask.warning ? "" : "primary"}`} autoFocus={!ask.warning} onClick={onInit}>
+          <button className={`btn ${ask.warning ? "" : "primary"}`} autoFocus={!ask.warning} onClick={go}>
             {ask.warning ? "Create it anyway" : "Initialize repository"}
           </button>
         </div>
