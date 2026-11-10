@@ -14,16 +14,6 @@ use crate::app::{App, Focus, Hit, RebaseForm};
 use crate::theme::{SymbolSet, Symbols, Theme};
 use crate::util::{clean, relative_time};
 
-/// Shorten to `w` characters with an ellipsis.
-fn fit(s: &str, w: usize) -> String {
-    if s.chars().count() <= w {
-        return s.to_string();
-    }
-    let mut out: String = s.chars().take(w.saturating_sub(1)).collect();
-    out.push('…');
-    out
-}
-
 fn bar(s: &Symbols, frac: f64, width: usize) -> String {
     let frac = frac.clamp(0.0, 1.0);
     if s.set == SymbolSet::Ascii {
@@ -380,68 +370,6 @@ fn draw_hot(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 // ------------------------------------------------------------------ repositories
-
-pub(super) fn draw_repos(f: &mut Frame, app: &mut App, area: Rect) {
-    let roots: Vec<String> = app.workspaces.iter().map(|p| clean(&p.display().to_string())).collect();
-    let title = format!("Repositories · {}", roots.join(", "));
-    let block = pane(&app.theme, &app.sym, title, true);
-    let inner = block.inner(area);
-    f.render_widget(block, area);
-    app.page = inner.height.saturating_sub(1) as usize;
-    let t = &app.theme;
-    if app.repos.is_empty() {
-        let msg = if app.repos_loading {
-            format!(" {} Looking for repositories…", app.spinner())
-        } else {
-            " No repositories found. Add folders with `workspaces = [\"~/code\"]` in the config.".to_string()
-        };
-        f.render_widget(Paragraph::new(msg).style(t.dim_style()).wrap(Wrap { trim: false }), inner);
-        return;
-    }
-    let h = inner.height as usize;
-    app.repo_off = scroll_to(app.repo_sel, app.repo_off, h, app.repos.len());
-    app.hits.push((inner, Hit::List(Focus::Repos, app.repo_off)));
-    let me = app.repo.root().canonicalize().ok();
-    let name_w = app.repos.iter().map(|r| r.name.chars().count()).max().unwrap_or(10).min(28);
-    for (i, r) in app.repos.iter().enumerate().skip(app.repo_off).take(h) {
-        let rect = row_rect(inner, i - app.repo_off);
-        if i == app.repo_sel {
-            f.buffer_mut().set_style(rect, t.selection(true));
-        }
-        let current = r.path.canonicalize().ok() == me;
-        let mut spans = vec![
-            Span::styled(if current { " * " } else { "   " }, Style::new().fg(t.accent).add_modifier(Modifier::BOLD)),
-            Span::styled(format!("{:<name_w$}", clean(&r.name)), Style::new().add_modifier(Modifier::BOLD)),
-            Span::styled(format!("  {} {:<18} ", app.sym.branch, fit(&clean(r.branch.as_deref().unwrap_or("-")), 18)), Style::new().fg(t.header)),
-        ];
-        if let Some(e) = &r.error {
-            spans.push(Span::styled(clean(e.lines().next().unwrap_or("")), Style::new().fg(t.del)));
-        } else {
-            let state = if r.conflicts > 0 {
-                Span::styled(format!("{:<12}", format!("{} conflicts", r.conflicts)), Style::new().fg(t.warn).add_modifier(Modifier::BOLD))
-            } else if r.changes > 0 {
-                Span::styled(format!("{:<12}", format!("{} changed", r.changes)), Style::new().fg(t.modified))
-            } else {
-                Span::styled(format!("{:<12}", "clean"), Style::new().fg(t.add))
-            };
-            spans.push(state);
-            let mut sync = String::new();
-            if r.ahead > 0 {
-                sync.push_str(&format!("{}{} ", app.sym.ahead, r.ahead));
-            }
-            if r.behind > 0 {
-                sync.push_str(&format!("{}{} ", app.sym.behind, r.behind));
-            }
-            if !r.upstream {
-                sync.push_str("local only");
-            }
-            spans.push(Span::styled(format!("{sync:<12}"), t.dim_style()));
-            spans.push(Span::styled(format!("{:>5}  ", r.last_commit.map(relative_time).unwrap_or_default()), t.dim_style()));
-        }
-        spans.push(Span::styled(clean(&r.path.display().to_string()), t.dim_style()));
-        f.render_widget(Line::from(spans), rect);
-    }
-}
 
 // ------------------------------------------------------------------ stash pane
 

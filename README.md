@@ -7,6 +7,8 @@ gitty            # mở repo chứa thư mục hiện tại
 gitty ~/code/x   # mở repo khác
 ```
 
+Chạy ở thư mục chưa phải repo thì gitty mở màn hình bắt đầu: repo mở gần đây, repo quanh đó, `o` mở thư mục bất kỳ, `c` clone, `i` tạo repo git (luôn hỏi trước). Nếu git không chịu mở một repo vì thư mục thuộc tài khoản khác, bấm `t` để tin cậy riêng thư mục đó.
+
 ## Tải về
 
 Ở trang [Releases](https://github.com/lettdev/gitty/releases):
@@ -41,7 +43,7 @@ cargo install --path crates/gitty-tui
 | `2` | **History** | Commit graph của mọi branch, chi tiết commit, diff từng file, interactive rebase (`r`) |
 | `3` | **Branches** | Switch, tạo, đổi tên, xoá branch; xem log của từng branch; quản lý stash |
 | `4` | **Insight** | Loại project, dung lượng theo thư mục, file lớn nhất trong lịch sử, LFS, `.gitignore`, file hay sửa |
-| `5` | **Repos** | Mọi repo trong thư mục làm việc: branch, số thay đổi, ahead/behind; `enter` để mở |
+| `5` | **Repos** | Repo mở gần đây và mọi repo trong thư mục làm việc: branch, số thay đổi, ahead/behind; `enter` mở, `o` mở thư mục, `c` clone |
 
 ## Phím chính
 

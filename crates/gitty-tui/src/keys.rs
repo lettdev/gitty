@@ -181,6 +181,10 @@ pub enum Action {
     IgnoreFile,
     IgnoreRules,
     About,
+    OpenFolder,
+    CloneRepo,
+    InitHere,
+    TrustFolder,
 }
 
 pub struct ActionInfo {
@@ -200,6 +204,10 @@ actions! {
     Quit, "quit", ["q", "ctrl+c"], "Quit gitty";
     Help, "help", ["?"], "Show all keys";
     About, "about", [], "About gitty (also: a in the keys screen)";
+    OpenFolder, "open_folder", ["o"], "Repositories: open any folder by path";
+    CloneRepo, "clone", ["c"], "Repositories: clone from a URL";
+    InitHere, "init_here", ["i"], "Repositories: set up git in a folder that has none";
+    TrustFolder, "trust_folder", ["t"], "Repositories: trust a repository owned by another account";
     ViewChanges, "view_changes", ["1"], "Changes view";
     ViewHistory, "view_history", ["2"], "History view";
     ViewBranches, "view_branches", ["3"], "Branches & stashes view";
@@ -363,7 +371,20 @@ pub const CONFLICT: &[Action] = &[
 
 pub const HEALTH: &[Action] = &[Action::Open, Action::Stage, NAV[0], NAV[1], NAV[2], NAV[3], NAV[4], NAV[5]];
 pub const INSIGHT_LIST: &[Action] = &[Action::Open, Action::Back, NAV[0], NAV[1], NAV[2], NAV[3], NAV[4], NAV[5]];
-pub const REPOS: &[Action] = &[Action::Open, NAV[0], NAV[1], NAV[2], NAV[3], NAV[4], NAV[5]];
+pub const REPOS: &[Action] = &[
+    Action::Open,
+    Action::OpenFolder,
+    Action::CloneRepo,
+    Action::InitHere,
+    Action::TrustFolder,
+    Action::Refresh,
+    NAV[0],
+    NAV[1],
+    NAV[2],
+    NAV[3],
+    NAV[4],
+    NAV[5],
+];
 
 #[derive(Deserialize, Clone, Debug)]
 #[serde(untagged)]

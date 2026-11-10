@@ -477,20 +477,19 @@ impl App {
     // ------------------------------------------------------------ repositories
 
     pub(super) fn ensure_repos(&mut self, force: bool) {
-        if self.repos_loading || (!self.repos.is_empty() && !force) {
-            return;
+        if force || (self.picker.rows.is_empty() && !self.picker.loading) {
+            self.picker.scan();
         }
-        self.repos_loading = true;
-        worker::spawn_repos(self.workspaces.clone(), self.sender());
     }
 
-    pub(super) fn open_selected_repo(&mut self) {
-        let Some(r) = self.repos.get(self.repo_sel) else { return };
-        let same = r.path.canonicalize().ok() == self.repo.root().canonicalize().ok();
-        if same {
-            self.notice(format!("{} is already open.", r.name));
-        } else {
-            self.switch_to = Some(r.path.clone());
+    pub(super) fn picker_key(&mut self, key: ratatui::crossterm::event::KeyEvent) {
+        let out = self.picker.on_key(&key, &self.keys);
+        self.on_picker(out);
+    }
+
+    pub(super) fn on_picker(&mut self, out: crate::picker::Outcome) {
+        if let crate::picker::Outcome::Open(repo) = out {
+            self.switch_to = Some(repo.root().to_path_buf());
         }
     }
 

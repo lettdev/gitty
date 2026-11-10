@@ -8,7 +8,7 @@ use ratatui::widgets::{Clear, Paragraph};
 use unicode_width::UnicodeWidthStr;
 
 use super::{centered, footer, popup_block};
-use crate::app::{App, PushPreview, cat_frame, plural};
+use crate::app::{App, PushPreview, plural};
 use crate::util::{clean, relative_time};
 
 pub(super) fn draw_push(f: &mut Frame, app: &App, p: &PushPreview, area: Rect) {
@@ -73,12 +73,14 @@ pub(super) fn draw_push(f: &mut Frame, app: &App, p: &PushPreview, area: Rect) {
 
 pub(super) fn draw_about(f: &mut Frame, app: &App, area: Rect) {
     let t = &app.theme;
-    let cat = cat_frame(app.elapsed_ms());
     let mut lines: Vec<Line> = vec![Line::raw("")];
-    for row in &cat {
-        lines.push(Line::styled(row.clone(), Style::new().fg(t.accent)));
+    // braille needs a font that has it; the old Windows console (ascii mode) doesn't
+    if app.sym.set != crate::theme::SymbolSet::Ascii {
+        for row in crate::cat::frame(app.elapsed_ms()) {
+            lines.push(Line::styled(row, Style::new().fg(t.accent)));
+        }
+        lines.push(Line::raw(""));
     }
-    lines.push(Line::raw(""));
     lines.push(Line::from(vec![
         Span::styled("gitty ", Style::new().fg(t.header).add_modifier(Modifier::BOLD)),
         Span::styled(concat!("v", env!("CARGO_PKG_VERSION")), t.dim_style()),

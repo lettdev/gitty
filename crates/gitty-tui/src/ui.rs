@@ -2,7 +2,10 @@
 
 mod extras;
 mod phase2;
+mod picker;
 mod sync;
+
+pub use picker::draw_start;
 
 use gitty_core::diff::LineKind;
 use gitty_core::log::{RefKind, RefLabel};
@@ -80,7 +83,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             View::History => draw_history(f, app, body),
             View::Branches => draw_branches(f, app, body),
             View::Insight => phase2::draw_insight(f, app, body),
-            View::Repos => phase2::draw_repos(f, app, body),
+            View::Repos => draw_repos(f, app, body),
         }
     }
     draw_bottom(f, app, bottom);
@@ -145,6 +148,18 @@ fn draw_top(f: &mut Frame, app: &mut App, area: Rect) {
         app.hits.push((rect, Hit::Tab(v)));
         x += w;
     }
+}
+
+/// Repositories view (5): the same picker as the start screen.
+fn draw_repos(f: &mut Frame, app: &mut App, area: Rect) {
+    let block = pane(&app.theme, &app.sym, "Repositories".into(), true);
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+    let inner = Rect { x: inner.x + 1, width: inner.width.saturating_sub(2), ..inner };
+    let spinner = app.spinner();
+    app.page = inner.height.saturating_sub(1) as usize;
+    let (list, off) = picker::draw_body(f, &mut app.picker, &app.theme, &app.sym, &app.keys, spinner, inner);
+    app.hits.push((list, Hit::List(Focus::Repos, off)));
 }
 
 // ------------------------------------------------------------------- bottom bar
@@ -213,7 +228,7 @@ fn hints(app: &App) -> Vec<(String, String)> {
         Focus::Sizes => vec![(k(Action::Open), "open folder".into()), (k(Action::Back), "up".into())],
         Focus::Blobs => vec![(k(Action::Open), "go to commit".into()), (k(Action::Refresh), "rescan".into())],
         Focus::Hot => vec![(k(Action::NextFocus), "next pane".into())],
-        Focus::Repos => vec![(k(Action::Open), "open".into()), (k(Action::Refresh), "rescan".into())],
+        Focus::Repos => picker::hints(&app.picker, &app.keys),
     };
     // what's waiting to go up or come down goes first, on every screen
     for (i, hint) in app.sync_hints().into_iter().enumerate() {
@@ -750,7 +765,7 @@ fn footer(t: &Theme, items: &[(&str, &str)]) -> Line<'static> {
 
 fn help_lines(app: &App) -> Vec<Line<'static>> {
     const SYNC: &[Action] = &[Action::Push, Action::Pull, Action::Fetch];
-    let groups: [(&str, &[Action]); 11] = [
+    let groups: [(&str, &[Action]); 12] = [
         ("Sync with the remote", SYNC),
         ("Everywhere", keys::GLOBAL),
         ("Files", keys::FILES),
@@ -761,6 +776,7 @@ fn help_lines(app: &App) -> Vec<Line<'static>> {
         ("Branches & stashes", keys::BRANCHES),
         ("Insight health", keys::HEALTH),
         ("Insight lists", keys::INSIGHT_LIST),
+        ("Repositories (5) and the start screen", keys::REPOS),
         ("Commit message", &[]),
     ];
     let t = &app.theme;

@@ -5,7 +5,6 @@
 
 use std::sync::mpsc::{Receiver, Sender};
 
-use std::path::PathBuf;
 
 use gitty_core::branch::Branch;
 use gitty_core::insight::{Blob, Insight};
@@ -14,7 +13,6 @@ use gitty_core::ops::{DiscardTarget, describe_paths};
 use gitty_core::rebase::RebaseStep;
 use gitty_core::stash::Stash;
 use gitty_core::status::Status;
-use gitty_core::workspace::{self, RepoSummary};
 use gitty_core::{Repo, RepoState};
 
 pub enum Msg {
@@ -26,7 +24,6 @@ pub enum Msg {
     FsChanged,
     Insight(Result<Box<Insight>, String>),
     Blobs(Result<Vec<Blob>, String>),
-    Repos(Vec<RepoSummary>),
 }
 
 pub struct RefreshData {
@@ -291,16 +288,3 @@ pub fn spawn_insight(repo: Repo, tx: Sender<Msg>, use_cache: bool) {
     });
 }
 
-pub fn spawn_repos(roots: Vec<PathBuf>, tx: Sender<Msg>) {
-    std::thread::spawn(move || {
-        let paths = workspace::find_repos(&roots, 2);
-        let chunks: Vec<Vec<PathBuf>> = paths.chunks(paths.len().div_ceil(8).max(1)).map(|c| c.to_vec()).collect();
-        let handles: Vec<_> = chunks
-            .into_iter()
-            .map(|chunk| std::thread::spawn(move || chunk.iter().map(|p| workspace::summarize(p)).collect::<Vec<_>>()))
-            .collect();
-        let mut all: Vec<RepoSummary> = handles.into_iter().flat_map(|h| h.join().unwrap_or_default()).collect();
-        all.sort_by(|a, b| b.last_commit.cmp(&a.last_commit).then(a.name.cmp(&b.name)));
-        let _ = tx.send(Msg::Repos(all));
-    });
-}

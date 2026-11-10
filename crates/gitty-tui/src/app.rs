@@ -16,7 +16,6 @@ use gitty_core::graph::{Cell, GraphBuilder};
 use gitty_core::insight::{Blob, Insight};
 use gitty_core::log::{Commit, CommitDetail, CommitFile};
 use gitty_core::stash::Stash;
-use gitty_core::workspace::RepoSummary;
 use gitty_core::oplog::OpKind;
 use gitty_core::ops::DiscardTarget;
 use gitty_core::status::{EntryKind, Status, StatusEntry};
@@ -33,7 +32,7 @@ use crate::worker::{self, Msg, OpJob, OpOutcome, RefreshData};
 
 pub use extras::{IgnoreMenu, IgnoreRulesView, RulesInput};
 pub use phase2::{ConflictView, RebaseForm};
-pub use sync::{PushPreview, cat_frame, plural};
+pub use sync::{PushPreview, plural};
 
 pub const LOG_PAGE: usize = 400;
 const DETAIL_DELAY: Duration = Duration::from_millis(80);
@@ -339,11 +338,8 @@ pub struct App {
     pub hot_off: usize,
 
     // Repositories
-    pub repos: Vec<RepoSummary>,
-    pub repos_loading: bool,
-    pub repo_sel: usize,
-    pub repo_off: usize,
-    pub workspaces: Vec<PathBuf>,
+    /// Repositories view (5): the same picker as the start screen.
+    pub picker: crate::picker::Picker,
     switch_to: Option<PathBuf>,
 
     pub popup: Option<Popup>,
@@ -371,6 +367,7 @@ pub struct App {
 
 impl App {
     pub fn new(repo: Repo, cfg: Config, cfg_error: Option<String>) -> Self {
+        crate::recent::remember(repo.root());
         let (keys, warnings) = Keymap::new(&cfg.keys);
         let (tx, rx) = mpsc::channel();
         let (ops, op_rx) = mpsc::channel();
@@ -380,6 +377,12 @@ impl App {
         } else {
             cfg.workspaces.iter().map(|w| crate::config::expand(w)).collect()
         };
+        let picker = crate::picker::Picker::new(
+            workspaces,
+            repo.root().parent().map(|p| p.to_path_buf()).unwrap_or_else(|| repo.root().to_path_buf()),
+            Some(repo.root().to_path_buf()),
+            crate::recent::load(),
+        );
         let mut app = Self {
             theme: Theme::new(theme::detect_depth(&cfg.color)),
             sym: Symbols::detect(&cfg.symbols),
@@ -442,11 +445,7 @@ impl App {
             blob_off: 0,
             hot_sel: 0,
             hot_off: 0,
-            repos: Vec::new(),
-            repos_loading: false,
-            repo_sel: 0,
-            repo_off: 0,
-            workspaces,
+            picker,
             switch_to: None,
             popup: None,
             notice: None,
@@ -571,7 +570,11 @@ impl App {
             self.notice = None;
             self.dirty = true;
         }
-        if self.busy > 0 || matches!(self.popup, Some(Popup::About)) {
+        if let Some(out) = self.picker.tick() {
+            self.dirty = true;
+            self.on_picker(out);
+        }
+        if self.busy > 0 || self.picker.busy.is_some() || matches!(self.popup, Some(Popup::About)) {
             self.dirty = true;
         }
     }
@@ -638,14 +641,6 @@ impl App {
                         self.blobs_error = None;
                     }
                     Err(e) => self.blobs_error = Some(e),
-                }
-            }
-            Msg::Repos(r) => {
-                self.repos_loading = false;
-                self.repos = r;
-                let me = self.repo.root().canonicalize().ok();
-                if let Some(i) = self.repos.iter().position(|x| x.path.canonicalize().ok() == me) {
-                    self.repo_sel = i;
                 }
             }
         }
@@ -1183,6 +1178,10 @@ impl App {
             return;
         }
         let chord = Chord::from_event(&key);
+        if self.focus == Focus::Repos && (self.picker.prompt.is_some() || self.picker.busy.is_some() || self.keys.find(&PICKER_KEYS, chord).is_some()) {
+            self.picker_key(key);
+            return;
+        }
         let action = self.keys.find(self.focus.actions(), chord).or_else(|| self.keys.find(keys::GLOBAL, chord));
         if let Some(a) = action {
             self.dispatch(a);
@@ -1251,7 +1250,7 @@ impl App {
                 let n = self.insight.as_ref().map(|i| i.hot.len()).unwrap_or(0);
                 self.hot_sel = clamp_add(self.hot_sel, delta, n);
             }
-            Focus::Repos => self.repo_sel = clamp_add(self.repo_sel, delta, self.repos.len()),
+            Focus::Repos => self.picker.sel = clamp_add(self.picker.sel, delta, self.picker.rows.len()),
         }
     }
 
@@ -1261,6 +1260,8 @@ impl App {
             Action::Quit => self.quit = true,
             Action::Help => self.popup = Some(Popup::Help { scroll: 0 }),
             Action::About => self.popup = Some(Popup::About),
+            // handled by the picker in the Repositories view
+            Action::OpenFolder | Action::CloneRepo | Action::InitHere | Action::TrustFolder => {}
             Action::ViewChanges => self.set_view(View::Changes),
             Action::ViewHistory => self.set_view(View::History),
             Action::ViewBranches => self.set_view(View::Branches),
@@ -1338,7 +1339,7 @@ impl App {
                 Focus::Health => self.apply_health_fix(),
                 Focus::Sizes => self.size_open(),
                 Focus::Blobs => self.blob_goto_commit(),
-                Focus::Repos => self.open_selected_repo(),
+                Focus::Repos => self.picker_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
                 Focus::Commits => self.focus = Focus::CommitFiles,
                 Focus::CommitFiles if self.cdiff.len() > 0 => self.focus = Focus::CommitDiff,
                 _ => {}
@@ -1660,7 +1661,7 @@ impl App {
                     Focus::Sizes => self.size_sel = row.min(self.size_node().map(|n| n.children.len()).unwrap_or(1).saturating_sub(1)),
                     Focus::Blobs => self.blob_sel = row.min(self.blobs.as_ref().map(Vec::len).unwrap_or(1).saturating_sub(1)),
                     Focus::Hot => self.hot_sel = row.min(self.insight.as_ref().map(|i| i.hot.len()).unwrap_or(1).saturating_sub(1)),
-                    Focus::Repos => self.repo_sel = row.min(self.repos.len().saturating_sub(1)),
+                    Focus::Repos => self.picker.click_line(row),
                 }
             }
             (MouseEventKind::ScrollDown | MouseEventKind::ScrollUp, Hit::List(f, _)) if f.view() == self.view => {
@@ -1671,6 +1672,9 @@ impl App {
         }
     }
 }
+
+/// Keys the Repositories view hands to the picker before the global ones.
+const PICKER_KEYS: [Action; 5] = [Action::Open, Action::OpenFolder, Action::CloneRepo, Action::InitHere, Action::TrustFolder];
 
 fn clamp_add(cur: usize, delta: isize, len: usize) -> usize {
     if len == 0 {

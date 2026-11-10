@@ -387,13 +387,13 @@ fn repos_view_lists_sibling_repositories() {
     fs::write(parent.path().join("beta/x.txt"), "x").unwrap();
     let mut app = app_for(&parent.path().join("alpha"));
     key(&mut app, KeyCode::Char('5'));
-    wait(&mut app, |a| a.repos.len() == 2);
+    wait(&mut app, |a| a.picker.rows.len() == 2);
     let s = screen(&mut app, 140, 20);
     println!("{s}");
     assert!(s.contains("alpha") && s.contains("beta"));
     assert!(s.contains("1 changed"));
-    let beta = app.repos.iter().position(|r| r.name == "beta").unwrap();
-    app.repo_sel = beta;
+    let beta = app.picker.rows.iter().position(|r| r.summary.name == "beta").unwrap();
+    app.picker.sel = beta;
     key(&mut app, KeyCode::Enter);
     let target = app.take_switch().expect("switch requested");
     assert!(target.ends_with("beta"));
@@ -590,9 +590,209 @@ fn about_screen_shows_the_cat() {
     assert!(matches!(app.popup, Some(Popup::About)));
     let s = screen(&mut app, 120, 40);
     println!("{s}");
-    assert!(s.contains(r"\_______/"), "{s}");
+    assert!(s.contains(&crate::cat::frame(app.elapsed_ms())[1]) || s.chars().filter(|c| ('\u{2801}'..='\u{28ff}').contains(c)).count() > 20, "the braille cat is drawn:\n{s}");
     assert!(s.contains("git + kitty"));
     assert!(s.contains(env!("CARGO_PKG_VERSION")));
     key(&mut app, KeyCode::Esc);
     assert!(app.popup.is_none());
+}
+
+// ------------------------------------------------------------------ start screen
+
+use crate::launcher::Launcher;
+
+fn start_screen(dir: &Path, recent: Vec<std::path::PathBuf>) -> Launcher {
+    let cfg = Config { symbols: "unicode".into(), color: "16".into(), ..Config::default() };
+    let err = Repo::discover(dir).err();
+    let mut l = Launcher::new(&cfg, dir, err, recent);
+    let start = Instant::now();
+    while l.picker.loading {
+        l.tick();
+        assert!(start.elapsed() < Duration::from_secs(30), "timed out scanning");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    l
+}
+
+fn start_text(l: &mut Launcher, w: u16, h: u16) -> String {
+    let mut term = Terminal::new(TestBackend::new(w, h)).unwrap();
+    term.draw(|f| ui::draw_start(f, l)).unwrap();
+    let buf = term.backend().buffer().clone();
+    let mut out = String::new();
+    for y in 0..h {
+        for x in 0..w {
+            out.push_str(buf[(x, y)].symbol());
+        }
+        out.push('\n');
+    }
+    out
+}
+
+fn press(l: &mut Launcher, code: KeyCode) {
+    l.on_event(Event::Key(KeyEvent::new(code, KeyModifiers::NONE)));
+}
+
+/// A plain folder (not inside any repository, unlike a temp dir under this repo).
+fn plain_dir() -> tempfile::TempDir {
+    let d = tempfile::tempdir().unwrap();
+    assert!(Repo::discover(d.path()).is_err(), "temp dir must not be inside a repository");
+    d
+}
+
+#[test]
+fn start_screen_offers_git_only_when_asked() {
+    let d = plain_dir();
+    let mut l = start_screen(d.path(), vec![]);
+    let s = start_text(&mut l, 120, 30);
+    println!("{s}");
+    assert!(s.contains("isn't a git repository"), "{s}");
+    assert!(s.contains("i set up git here"));
+    assert!(s.contains("gitty v"));
+    assert!(!d.path().join(".git").exists(), "nothing happens on its own");
+    press(&mut l, KeyCode::Char('i'));
+    let s = start_text(&mut l, 120, 30);
+    assert!(s.contains("Set up git in"), "{s}");
+    press(&mut l, KeyCode::Char('n'));
+    assert!(l.picker.prompt.is_none() && !d.path().join(".git").exists(), "n backs out");
+    press(&mut l, KeyCode::Char('i'));
+    press(&mut l, KeyCode::Enter);
+    assert!(d.path().join(".git").exists());
+    let repo = l.opened.take().expect("opens the new repository");
+    assert_eq!(repo.root().canonicalize().unwrap(), d.path().canonicalize().unwrap());
+}
+
+#[test]
+fn start_screen_lists_recent_and_nearby_repositories() {
+    let parent = plain_dir();
+    for name in ["alpha", "beta"] {
+        let p = parent.path().join(name);
+        fs::create_dir_all(&p).unwrap();
+        git(&p, &["init", "-q", "-b", "main"]);
+    }
+    let mut l = start_screen(parent.path(), vec![parent.path().join("beta")]);
+    let s = start_text(&mut l, 140, 30);
+    println!("{s}");
+    assert!(s.contains("Recent") && s.contains("beta"));
+    assert!(s.contains("In ") && s.contains("alpha"));
+    assert_eq!(l.picker.rows.len(), 2, "beta is listed once, as recent");
+    // the recent one comes first and is selected
+    assert!(l.picker.rows[l.picker.sel].recent);
+    press(&mut l, KeyCode::Enter);
+    let repo = l.opened.take().expect("opens");
+    assert!(repo.root().ends_with("beta"));
+}
+
+#[test]
+fn start_screen_opens_a_typed_folder() {
+    let parent = plain_dir();
+    let p = parent.path().join("gamma");
+    fs::create_dir_all(&p).unwrap();
+    git(&p, &["init", "-q", "-b", "main"]);
+    let mut l = start_screen(parent.path(), vec![]);
+    press(&mut l, KeyCode::Char('o'));
+    for c in "gamma".chars() {
+        press(&mut l, KeyCode::Char(c));
+    }
+    assert!(start_text(&mut l, 120, 30).contains("Open folder:"));
+    press(&mut l, KeyCode::Enter);
+    let repo = l.opened.take().expect("opens the typed folder");
+    assert!(repo.root().ends_with("gamma"));
+}
+
+#[test]
+fn start_screen_quits() {
+    let d = plain_dir();
+    let mut l = start_screen(d.path(), vec![]);
+    press(&mut l, KeyCode::Char('q'));
+    assert!(l.quit);
+}
+
+#[test]
+fn only_a_missing_repository_offers_git_init() {
+    use crate::picker::{Target, target_for};
+    let p = Path::new("/somewhere");
+    assert!(matches!(target_for(p, gitty_core::Error::NotARepo(String::new())), Target::NotARepo { .. }));
+    assert!(matches!(
+        target_for(p, gitty_core::Error::UntrustedRepo { path: "/somewhere".into() }),
+        Target::Untrusted { .. }
+    ));
+    let other = gitty_core::Error::Command { command: "git rev-parse".into(), stderr: "fatal: bad config line 3".into() };
+    assert!(matches!(target_for(p, other), Target::Failed { .. }), "other git errors are shown, never answered with git init");
+}
+
+#[test]
+fn repos_view_opens_a_typed_folder_too() {
+    let parent = tempfile::tempdir().unwrap();
+    for name in ["alpha", "delta"] {
+        let p = parent.path().join(name);
+        fs::create_dir_all(&p).unwrap();
+        git(&p, &["init", "-q", "-b", "main"]);
+    }
+    let mut app = app_for(&parent.path().join("alpha"));
+    key(&mut app, KeyCode::Char('5'));
+    key(&mut app, KeyCode::Char('o'));
+    chars(&mut app, "delta");
+    key(&mut app, KeyCode::Enter);
+    let target = app.take_switch().expect("switch requested");
+    assert!(target.ends_with("delta"));
+}
+
+fn unity_like(root: &Path) {
+    let w = |rel: &str, bytes: usize| {
+        let p = root.join(rel);
+        fs::create_dir_all(p.parent().unwrap()).unwrap();
+        fs::write(p, vec![b'x'; bytes]).unwrap();
+    };
+    w("Assets/Scripts/Player.cs", 400);
+    w("Packages/manifest.json", 20);
+    w("Library/ArtifactDB", 900_000);
+    w("Temp/x.tmp", 1000);
+    fs::write(root.join("ProjectSettings/ProjectVersion.txt").as_path(), "").ok();
+    fs::create_dir_all(root.join("ProjectSettings")).unwrap();
+    fs::write(root.join("ProjectSettings/ProjectVersion.txt"), "m_EditorVersion: 6000.0.1f1\n").unwrap();
+}
+
+fn wait_preview(l: &mut Launcher) {
+    let start = Instant::now();
+    while l.picker.target_preview().is_none() {
+        l.tick();
+        assert!(start.elapsed() < Duration::from_secs(30), "timed out waiting for the folder preview");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+#[test]
+fn start_screen_previews_the_folder_and_sets_up_ignore_rules() {
+    let d = plain_dir();
+    unity_like(d.path());
+    let mut l = start_screen(d.path(), vec![]);
+    wait_preview(&mut l);
+    let s = start_text(&mut l, 130, 40);
+    println!("{s}");
+    assert!(s.contains("Unity project"), "{s}");
+    assert!(s.contains("Library/") && s.contains("left out (Unity rules)"), "{s}");
+    assert!(s.contains("git would track"), "{s}");
+    press(&mut l, KeyCode::Char('i'));
+    let s = start_text(&mut l, 130, 40);
+    println!("{s}");
+    assert!(s.contains("[x] Add Unity .gitignore rules"), "{s}");
+    assert!(s.contains("nothing is staged or committed"));
+    press(&mut l, KeyCode::Enter);
+    let repo = l.opened.take().expect("opens the new repository");
+    let ignore = fs::read_to_string(repo.root().join(".gitignore")).unwrap();
+    assert!(ignore.contains("/Library/") && ignore.contains("/Temp/"), "{ignore}");
+}
+
+#[test]
+fn ignore_rules_can_be_left_out() {
+    let d = plain_dir();
+    unity_like(d.path());
+    let mut l = start_screen(d.path(), vec![]);
+    wait_preview(&mut l);
+    press(&mut l, KeyCode::Char('i'));
+    press(&mut l, KeyCode::Char(' '));
+    assert!(start_text(&mut l, 130, 40).contains("[ ] Add Unity .gitignore rules"));
+    press(&mut l, KeyCode::Enter);
+    assert!(l.opened.is_some());
+    assert!(!d.path().join(".gitignore").exists());
 }
